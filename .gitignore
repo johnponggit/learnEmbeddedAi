@@ -1,0 +1,10 @@
+.idea/
+.cache/
+cmake-build-*
+/logs
+/build
+.vscode/
+RuntimeRelease/
+
+
+

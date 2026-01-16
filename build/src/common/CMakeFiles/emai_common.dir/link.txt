@@ -1,2 +1,0 @@
-/work/onvif/crosscompilation/toolchain/gcc-arm-8.3-2019.03-x86_64-arm-linux-gnueabihf/bin/arm-linux-gnueabihf-ar qc libemai_common.a CMakeFiles/emai_common.dir/media/videoDecoder.cpp.o CMakeFiles/emai_common.dir/media/videoDecoderFfmpegCpu.cpp.o CMakeFiles/emai_common.dir/media/videoParser.cpp.o CMakeFiles/emai_common.dir/util/util.cpp.o
-/work/onvif/crosscompilation/toolchain/gcc-arm-8.3-2019.03-x86_64-arm-linux-gnueabihf/bin/arm-linux-gnueabihf-ranlib libemai_common.a
