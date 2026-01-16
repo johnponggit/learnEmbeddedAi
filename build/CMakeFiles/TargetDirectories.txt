@@ -1,0 +1,7 @@
+/work/tmp/learnEmbeddedAi/build/CMakeFiles/edit_cache.dir
+/work/tmp/learnEmbeddedAi/build/CMakeFiles/rebuild_cache.dir
+/work/tmp/learnEmbeddedAi/build/src/CMakeFiles/edit_cache.dir
+/work/tmp/learnEmbeddedAi/build/src/CMakeFiles/rebuild_cache.dir
+/work/tmp/learnEmbeddedAi/build/src/common/CMakeFiles/emai_common.dir
+/work/tmp/learnEmbeddedAi/build/src/common/CMakeFiles/edit_cache.dir
+/work/tmp/learnEmbeddedAi/build/src/common/CMakeFiles/rebuild_cache.dir
