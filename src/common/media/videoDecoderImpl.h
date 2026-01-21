@@ -17,9 +17,7 @@ extern "C" {
 #include <libavformat/avformat.h>
 #include <libavutil/avutil.h>
 #include <libavutil/imgutils.h>
-#if LIBAVFORMAT_VERSION_INT == FFMPEG_VERSION_4_2_2
 #include <libavutil/hwcontext.h>
-#endif
 #ifdef __cplusplus
 }
 #endif
@@ -37,10 +35,7 @@ public:
     virtual ~IDecodeEventHandle() = default;
 
     virtual void onDecodeEos() = 0;
-    virtual bool needSnap(const int64_t frmIndex) = 0;
-    virtual void onSnapDone(const std::string& filename, std::shared_ptr<const std::string> fileData, const int64_t curFrmIndex) = 0;
-    virtual int  getMinSnapInterval() = 0;
-    virtual void setKeyFrmInfo(const int fps, const int gopSz, bool en) = 0;
+    virtual void onDecodeFrame(AVFrame* frame, const int64_t frmIndex) = 0;
 };
 
 class VideoDecoderImpl {

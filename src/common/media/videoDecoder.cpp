@@ -16,7 +16,7 @@ VideoDecoder::VideoDecoder(IDecodeEventHandle::wPtr handle, DecoderType type, in
 
     switch (type) {
         case FFMPEG_CPU:
-            impl_ = std::make_unique<VideoDecoderFfmpegCpu>(handle);
+            impl_ = std::make_unique<VideoDecoderFfmpegCpu>(handle, false);
             break;
 
         default:

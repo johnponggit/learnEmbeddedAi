@@ -1,0 +1,14 @@
+prefix=/work/test/ffmpegTest/install/ffmpeg
+exec_prefix=${prefix}
+libdir=/work/test/ffmpegTest/install/ffmpeg/lib
+includedir=/work/test/ffmpegTest/install/ffmpeg/include
+
+Name: libavcodec
+Description: FFmpeg codec library
+Version: 59.37.100
+Requires: 
+Requires.private: libswresample >= 4.7.100, libavutil >= 57.28.100
+Conflicts:
+Libs: -L${libdir}  -lavcodec 
+Libs.private: -pthread -lm -latomic -L/work/onvif/crosscompilation/toolchain/gcc-arm-8.3-2019.03-x86_64-arm-linux-gnueabihf/arm-linux-gnueabihf/libc/work/test/ffmpegTest/install/x264/lib -lx264 -lpthread -lm -ldl -L/work/onvif/crosscompilation/toolchain/gcc-arm-8.3-2019.03-x86_64-arm-linux-gnueabihf/arm-linux-gnueabihf/libc/work/test/ffmpegTest/install/x265/lib -lx265 -lstdc++ -lm -lgcc_s -lgcc -lgcc_s -lgcc -lrt -ldl
+Cflags: -I${includedir}

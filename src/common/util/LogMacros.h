@@ -15,13 +15,8 @@ enum LogLevel {
     LOG_LEVEL_DEBUG
 };
 
-// 获取当前时间的字符串表示（简化版）
-std::string getCurrentTime() {
-    time_t now = time(nullptr);
-    char buf[80];
-    strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", localtime(&now));
-    return std::string(buf);
-}
+
+
 
 // 日志类
 class Logger {
@@ -66,6 +61,13 @@ public:
     }
     
 private:
+    std::string getCurrentTime() {
+        time_t now = time(nullptr);
+        char buf[80];
+        strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", localtime(&now));
+        return std::string(buf);
+    }
+
     LogLevel level_;
     const char* file_;
     int line_;
@@ -73,10 +75,10 @@ private:
 };
 
 // 定义日志宏
-#define LOG_ERROR(...) Logger(LOG_LEVEL_ERROR, __FILE__, __LINE__) << __VA_ARGS__
-#define LOG_WARN(...)  Logger(LOG_LEVEL_WARN, __FILE__, __LINE__) << __VA_ARGS__
-#define LOG_INFO(...)  Logger(LOG_LEVEL_INFO, __FILE__, __LINE__) << __VA_ARGS__
-#define LOG_DEBUG(...) Logger(LOG_LEVEL_DEBUG, __FILE__, __LINE__) << __VA_ARGS__
+#define LOG_ERROR(...) emai::Logger(emai::LOG_LEVEL_ERROR, __FILE__, __LINE__) << __VA_ARGS__
+#define LOG_WARN(...)  emai::Logger(emai::LOG_LEVEL_WARN, __FILE__, __LINE__) << __VA_ARGS__
+#define LOG_INFO(...)  emai::Logger(emai::LOG_LEVEL_INFO, __FILE__, __LINE__) << __VA_ARGS__
+#define LOG_DEBUG(...) emai::Logger(emai::LOG_LEVEL_DEBUG, __FILE__, __LINE__) << __VA_ARGS__
 
 }
 

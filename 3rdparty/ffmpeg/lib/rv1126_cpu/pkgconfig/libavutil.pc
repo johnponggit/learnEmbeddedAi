@@ -1,0 +1,14 @@
+prefix=/work/test/ffmpegTest/install/ffmpeg
+exec_prefix=${prefix}
+libdir=/work/test/ffmpegTest/install/ffmpeg/lib
+includedir=/work/test/ffmpegTest/install/ffmpeg/include
+
+Name: libavutil
+Description: FFmpeg utility library
+Version: 57.28.100
+Requires: 
+Requires.private: 
+Conflicts:
+Libs: -L${libdir}  -lavutil 
+Libs.private: -pthread -lm -latomic
+Cflags: -I${includedir}

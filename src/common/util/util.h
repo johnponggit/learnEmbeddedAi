@@ -12,6 +12,16 @@
 #include <malloc.h>
 #include <memory> 
 #include <utility>
+#include <mutex>
+#include <queue>
+#include <atomic>
+#include <vector>
+#include <sstream>
+#include <iomanip>
+#include <map>
+#include <cmath>
+#include <condition_variable>
+#include <algorithm>
 
 #include "LogMacros.h"
 

@@ -63,9 +63,7 @@ inline bool IsRtsp(const std::string& url) { return detail::BeginWith(url)("rtsp
  
 struct VideoInfo {
     AVCodecID codec_id = AV_CODEC_ID_NONE;
-    #if LIBAVFORMAT_VERSION_INT >= FFMPEG_VERSION_3_1
     AVCodecParameters* codecpar = nullptr;
-    #endif
     AVCodecContext* codec_ctx = nullptr;
     std::vector<uint8_t> extra_data{};
     int width = 0;
@@ -107,7 +105,7 @@ public:
 private:
     static constexpr uint32_t max_receive_timeout_{3000};
     bool        isRecoverableError(int error_code);
-
+  
     AVFormatContext* p_format_ctx_ = nullptr;
     AVPacket packet_;
     AVDictionary* options_{nullptr};

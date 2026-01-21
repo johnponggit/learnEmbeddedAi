@@ -3,27 +3,17 @@
 
 #include "util.h"
 #include "videoDecoderImpl.h"
+#include "jpegEncoderImpl.h"
 
 namespace emai {
 
-struct FetchGopSize
-{
-    int     gopSize = 0;
-    bool    fectchGopSizeOk{false};
-    bool    haveFirstKeyFrm{false};
-};
 
-struct KeyFrmDecCtr
-{
-    bool    keyFrmDecEn{false};
-    bool    haveFirstKeyFrm{false};
-};
 
 const std::string kSavedTmpPicDir = "./tmpPic/";
 
 class VideoDecoderFfmpegCpu : public VideoDecoderImpl {
 public:
-    VideoDecoderFfmpegCpu(IDecodeEventHandle::wPtr handle);
+    VideoDecoderFfmpegCpu(IDecodeEventHandle::wPtr handle, bool decodeDebugEn = false);
     ~VideoDecoderFfmpegCpu();
 
     virtual bool Init(const VideoInfo& info) override; 
@@ -34,9 +24,6 @@ public:
 private:
     bool        ProcessFrame(AVFrame* frame, const int64_t frmIndex);
     void        printStreamInfo(); 
-    bool        initJpegEncoder(const int width, const int height); 
-    bool        saveFrameAsJpeg(AVFrame* frame, const std::string& filename, std::string& outFileData); 
-    AVFrame*    convert2yuv(AVFrame* frame); 
     std::string generateFilename(const std::string& output_dir); 
     uint64_t    getSavedPicNum() const; 
     void        addSavedPicNum(int num); 
@@ -48,8 +35,8 @@ private:
 private:
     AVCodecContext*          decode_{nullptr};
     AVFrame                 *av_frame_ = nullptr;
-    AVCodecContext*          jpegCtx_{nullptr};
-    struct SwsContext*       swsCtx_{nullptr};
+
+    JpegEncoderImpl::Ptr     jpegEncoder_{nullptr};
     
     IDecodeEventHandle::wPtr handle_;
 
@@ -62,8 +49,8 @@ private:
     uint16_t                 tmpPicMaxNum_{3};
     std::atomic<uint64_t>    savedPicNum_{0};
 
-    FetchGopSize             fetchGopSize_{};
-    KeyFrmDecCtr             keyFrmDecCtr_{};
+    bool                      decodeDebugEn_{false};
+
 };
        
 

@@ -7,6 +7,8 @@ set(CMAKE_SYSTEM_PROCESSOR arm)
 
 # 指定交叉编译工具链路径
 set(TOOLCHAIN_PATH "/work/onvif/crosscompilation/toolchain/gcc-arm-8.3-2019.03-x86_64-arm-linux-gnueabihf/bin")
+set(CROSS_COMPILE_TOOLCHAIN_PATH "/work/onvif/crosscompilation/toolchain/gcc-arm-8.3-2019.03-x86_64-arm-linux-gnueabihf/")
+
 
 # 设置编译器
 set(CMAKE_C_COMPILER ${TOOLCHAIN_PATH}/arm-linux-gnueabihf-gcc)
@@ -20,6 +22,16 @@ set(CMAKE_OBJCOPY ${TOOLCHAIN_PATH}/arm-linux-gnueabihf-objcopy)
 set(CMAKE_OBJDUMP ${TOOLCHAIN_PATH}/arm-linux-gnueabihf-objdump)
 set(CMAKE_RANLIB ${TOOLCHAIN_PATH}/arm-linux-gnueabihf-ranlib)
 set(CMAKE_STRIP ${TOOLCHAIN_PATH}/arm-linux-gnueabihf-strip)
+
+# 设置交叉编译系统根目录（sysroot）
+set(CMAKE_SYSROOT ${CROSS_COMPILE_TOOLCHAIN_PATH}/arm-linux-gnueabihf/libc)
+set(CMAKE_FIND_ROOT_PATH ${CMAKE_SYSROOT})
+
+# 只在 sysroot 中查找库
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_PACKAGE ONLY)
 
 # 设置编译器和链接器标志
 #set(CMAKE_C_FLAGS "-march=armv7-a -mfpu=neon -mfloat-abi=hard" CACHE STRING "C flags")
@@ -41,8 +53,12 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
 endif()
 
+#set(FFMPEG_LIB_TYPE "rv1126_5.1.2_cpu")
+set(FFMPEG_LIB_TYPE "rv1126_4.1.3_rkmpp")
+
 # 输出信息
 message(STATUS "Cross-compiling for ARM Linux (gnueabihf)")
 message(STATUS "Toolchain path: ${TOOLCHAIN_PATH}")
 message(STATUS "C compiler: ${CMAKE_C_COMPILER}")
 message(STATUS "C++ compiler: ${CMAKE_CXX_COMPILER}")
+message(STATUS "FFMPEG_LIB_TYPE: ${FFMPEG_LIB_TYPE}")

@@ -11,21 +11,14 @@
 #include <filesystem>
 
 #include "videoDecoderFfmpegCpu.h"
- 
+#include "jpegEncoderFfmpegCpu.h"
+
 namespace fs = std::filesystem;
 
 namespace emai{
 
-static std::string pixelFormatToString(AVPixelFormat pix_fmt) {
-    const char* fmt_name = av_get_pix_fmt_name(pix_fmt);
-    if (fmt_name) {
-        return fmt_name;
-    } else {
-        return "Unknown pixel format: " + std::to_string(static_cast<int>(pix_fmt));
-    }
-}
 
-VideoDecoderFfmpegCpu::VideoDecoderFfmpegCpu(IDecodeEventHandle::wPtr handle) : handle_(handle)
+VideoDecoderFfmpegCpu::VideoDecoderFfmpegCpu(IDecodeEventHandle::wPtr handle, bool decodeDebugEn) : handle_(handle), decodeDebugEn_(decodeDebugEn)
 {
     LOG_INFO("in VideoDecoderFfmpegCpu ctor");
 }
@@ -45,11 +38,6 @@ bool VideoDecoderFfmpegCpu::Init(const VideoInfo& info)
     {
         LOG_WARN("VideoDecoderFfmpegCpu already initOk");
         return true;
-    }
-
-    if (!initJpegEncoder(info.width, info.height)) {
-        LOG_ERROR("in VideoDecoderFfmpegCpu Init init_jpeg_encoder failed");
-        return false;
     }
 
     const AVCodec *dec = avcodec_find_decoder(info.codec_id);
@@ -198,16 +186,6 @@ int VideoDecoderFfmpegCpu::unInit()
         return 0;
     }
 
-    if (swsCtx_) {
-        sws_freeContext(swsCtx_);
-        swsCtx_ = nullptr;
-    }
-
-    if (jpegCtx_) {
-        avcodec_free_context(&jpegCtx_);
-        jpegCtx_ = nullptr;
-    }
-
     if (av_frame_) {
         av_frame_free(&av_frame_);
         av_frame_ = nullptr;
@@ -219,7 +197,7 @@ int VideoDecoderFfmpegCpu::unInit()
     }
 
     initOk.store(false);
-
+    
     clrTmpPics();
     
     return 0;
@@ -229,22 +207,30 @@ bool VideoDecoderFfmpegCpu::ProcessFrame(AVFrame* frame, const int64_t frmIndex)
 {
     if (auto handle = handle_.lock())
     {
-        if (!handle->needSnap(frmIndex))
+        /* for debug */
+        if (decodeDebugEn_) 
         {
-            return true;
-        }
+            std::string filename = generateFilename(kSavedTmpPicDir);
+            std::string fileData;
 
-        std::string filename = generateFilename(kSavedTmpPicDir);
-        std::string fileData;
-        if (saveFrameAsJpeg(frame, filename, fileData)) 
-        {
-            addSavedPicNum(1);
+            if (!jpegEncoder_) 
+            {
+                jpegEncoder_ = std::make_shared<emai::JpegEncoderFfmpegCpu>();
 
-            auto pData = std::make_shared<std::string>(std::move(fileData));
-            handle->onSnapDone(filename, pData, frmIndex);
+                if (!jpegEncoder_ || !jpegEncoder_->Init(frame->width, frame->height))
+                {
+                    jpegEncoder_.reset();
+                    LOG_ERROR("in VideoDecoderFfmpegCpu ProcessFrame jpegEncoder_ init failed");
+                }
+            }                 
 
-            keyFrmDecCtr_.haveFirstKeyFrm = false;  // 重置关键帧等待状态
-        }        
+            if (jpegEncoder_->saveFrameAsJpeg(frame, filename, fileData)) 
+            {
+                addSavedPicNum(1);
+            }  
+        }              
+
+        handle->onDecodeFrame(frame, frmIndex);
     }
 
     return true;
@@ -271,141 +257,6 @@ void VideoDecoderFfmpegCpu::printStreamInfo()
    
 }
 
-bool VideoDecoderFfmpegCpu::initJpegEncoder(const int width, const int height) 
-{
-    LOG_INFO("in VideoDecoderFfmpegCpu initJpegEncoder, width:" << width << ", height:" << height);
-
-    const AVCodec* jpeg_codec = avcodec_find_encoder(AV_CODEC_ID_MJPEG);
-    if (!jpeg_codec) 
-    {
-        LOG_ERROR("in VideoDecoderFfmpegCpu initJpegEncoder avcodec_find_encoder failed");
-        return false;
-    }
-    
-    jpegCtx_ = avcodec_alloc_context3(jpeg_codec);
-    if (!jpegCtx_) 
-    {
-        LOG_ERROR("in VideoDecoderFfmpegCpu initJpegEncoder avcodec_alloc_context3 failed");
-        return false;
-    }
-    
-    jpegCtx_->width     = width;    
-    jpegCtx_->height    = height;
-    jpegCtx_->pix_fmt   = AV_PIX_FMT_YUVJ420P;
-    jpegCtx_->time_base = (AVRational){1, 25};
-    
-    int ret = -1;
-    if ((ret = avcodec_open2(jpegCtx_, jpeg_codec, nullptr)) < 0) {
-        LOG_ERROR("in VideoDecoderFfmpegCpu initJpegEncoder avcodec_open2 failed, ret:" << ret << ",errMsg:" << detail::avErrorToString(ret));
-        avcodec_free_context(&jpegCtx_);
-        return false;
-    }
-    
-    return true;
-}
-
-bool VideoDecoderFfmpegCpu::saveFrameAsJpeg(AVFrame* frame, const std::string& filename, std::string& outFileData) 
-{
-    if (!jpegCtx_) 
-    {
-        LOG_ERROR("in VideoDecoderFfmpegCpu saveFrameAsJpeg jpegCtx_ is null");
-        return false;
-    }
-
-    if (!frame)
-    {
-        LOG_ERROR("in VideoDecoderFfmpegCpu saveFrameAsJpeg frame is null");
-        return false;
-    }
-    
-    LOG_INFO("in VideoDecoderFfmpegCpu saveFrameAsJpeg, filename:" << filename 
-                << ", frame format:" << pixelFormatToString((AVPixelFormat)frame->format)
-                << ", width:" << frame->width << ", height:" << frame->height);
-            
-    // 确保JPEG编码器尺寸匹配
-    if (jpegCtx_->width != frame->width || jpegCtx_->height != frame->height) {
-        LOG_WARN("in VideoDecoderFfmpegCpu saveFrameAsJpeg resizing jpegCtx_ from "
-                    << jpegCtx_->width << "x" << jpegCtx_->height << " to "
-                    << frame->width << "x" << frame->height);
-        
-        avcodec_free_context(&jpegCtx_);
-        jpegCtx_ = nullptr;
-
-        if (!initJpegEncoder(frame->width, frame->height)) 
-        {
-            LOG_ERROR("in VideoDecoderFfmpegCpu saveFrameAsJpeg re-init jpegCtx_ failed");
-            return false;
-        }
-
-        jpegCtx_->width = frame->width;
-        jpegCtx_->height = frame->height;
-    }
-    
-    AVFrame* yuv_frame = convert2yuv(frame);
-    if (!yuv_frame) 
-    {
-        LOG_ERROR("in VideoDecoderFfmpegCpu saveFrameAsJpeg convert2yuv failed");
-        return false;
-    }
-
-    AVPacket* pkt = av_packet_alloc();
-    bool success = false;
-    
-    if (avcodec_send_frame(jpegCtx_, yuv_frame) >= 0 &&
-        avcodec_receive_packet(jpegCtx_, pkt) >= 0) {
-        
-        outFileData = std::string(reinterpret_cast<char*>(pkt->data), pkt->size);
-
-        FILE* file = fopen(filename.c_str(), "wb");
-        if (file) {
-            fwrite(pkt->data, 1, pkt->size, file);
-            fclose(file);
-            success = true;
-        }
-    }
-    
-    av_packet_free(&pkt);
-    av_frame_free(&yuv_frame);
-
-    LOG_INFO("in VideoDecoderFfmpegCpu saveFrameAsJpeg, url_:" << url_ << ", filename:" << filename 
-                << (success ? " saved successfully." : " failed to save.") << 
-                ", file data size:" << outFileData.size());    
-
-    return success;
-}
-
-AVFrame* VideoDecoderFfmpegCpu::convert2yuv(AVFrame* frame) 
-{
-    if (!swsCtx_) {
-        LOG_INFO("in VideoDecoderFfmpegCpu convert2yuv initializing swsCtx_");
-        swsCtx_ = sws_getContext(
-            frame->width, frame->height, (AVPixelFormat)frame->format,
-            frame->width, frame->height, AV_PIX_FMT_YUVJ420P,
-            SWS_BILINEAR, nullptr, nullptr, nullptr);
-    }
-    
-    if (!swsCtx_) 
-    {
-        LOG_ERROR("in VideoDecoderFfmpegCpu convert2yuv sws_getContext failed");
-        return nullptr;
-    }
-
-    AVFrame* yuv_frame = av_frame_alloc();
-    yuv_frame->format = AV_PIX_FMT_YUVJ420P;
-    yuv_frame->width = frame->width;
-    yuv_frame->height = frame->height;
-    
-    if (av_frame_get_buffer(yuv_frame, 0) < 0) {
-        LOG_ERROR("in VideoDecoderFfmpegCpu convert2yuv av_frame_get_buffer failed");
-        av_frame_free(&yuv_frame);
-        return nullptr;
-    }
-    
-    sws_scale(swsCtx_, frame->data, frame->linesize, 0,
-              frame->height, yuv_frame->data, yuv_frame->linesize);
-    
-    return yuv_frame;
-}
 
 std::string VideoDecoderFfmpegCpu::generateFilename(const std::string& output_dir) 
 {

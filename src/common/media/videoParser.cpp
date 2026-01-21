@@ -25,6 +25,17 @@
 
 const uint32_t kDefaultFps = 25;
 
+static void printVersionInfo() {
+    unsigned int version = avformat_version();
+    
+    LOG_INFO("libavformat 版本信息: " << AV_VERSION_MAJOR(version) << "." << AV_VERSION_MINOR(version) << "." << AV_VERSION_MICRO(version));   
+    LOG_INFO("配置信息: " << avformat_configuration());
+    LOG_INFO("许可证: " << avformat_license());
+    
+    
+    // avformat_version_info();
+}
+
 std::ostream& operator<<(std::ostream& os, const VideoInfo& info)
 {
     return os << "VideoInfo{ width:" << info.width
@@ -74,6 +85,8 @@ bool VideoParser::Open(const char *url, bool save_file) {
             avcodec_register_all();
             av_register_all();
             #endif
+
+            printVersionInfo();
         }
     } _init_ffmpeg;
 
@@ -109,13 +122,27 @@ bool VideoParser::Open(const char *url, bool save_file) {
     }
     video_index_ = -1;
     AVStream *vstream = nullptr;
+    LOG_INFO("url:" << url << " Find stream information, nb_streams:" << p_format_ctx_->nb_streams);
+
     for (uint32_t iloop = 0; iloop < p_format_ctx_->nb_streams; iloop++) {
         vstream = p_format_ctx_->streams[iloop];
-        #if LIBAVFORMAT_VERSION_INT >= FFMPEG_VERSION_3_1
-        if (vstream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-        #else
-        if (vstream->codec->codec_type == AVMEDIA_TYPE_VIDEO) {
-        #endif
+
+        LOG_INFO("url:" << url << " stream index:" << iloop << ", vstream is valid: " << (vstream ? "true" : "false") <<
+                 ", codecpar is valid: " << (vstream->codecpar ? "true" : "false"));
+
+        if (!vstream)
+        {
+            LOG_WARN("url:" << url << " stream index:" << iloop << " vstream is invalid");
+            continue;
+        }
+
+        if (!vstream->codecpar) {
+            LOG_WARN("url:" << url << " stream index:" << iloop << " codecpar is invalid");
+            continue;
+        }      
+
+        //LOG_INFO("url:" << url << " stream index:" << iloop << " codecpar codec type: " << static_cast<int>(vstream->codecpar->codec_type));
+        if (vstream->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) { 
             video_index_ = iloop;
             break;
         }
@@ -126,28 +153,16 @@ bool VideoParser::Open(const char *url, bool save_file) {
         return false;
     }
 
-    #if LIBAVFORMAT_VERSION_INT >= FFMPEG_VERSION_3_1
     info_.width = vstream->codecpar->width;
     info_.height = vstream->codecpar->height;
-    #else
-    info_.width = vstream->codec->width;
-    info_.height = vstream->codec->height;
-    #endif
 
     // Get codec id, check progressive
-    #if LIBAVFORMAT_VERSION_INT >= FFMPEG_VERSION_3_1
     auto codec_id = vstream->codecpar->codec_id;
     int field_order = vstream->codecpar->field_order;
-    #else
-    auto codec_id = vstream->codec->codec_id;
-    int field_order = vstream->codec->field_order;
-    #endif
+
     info_.codec_id = codec_id;
-    #if LIBAVFORMAT_VERSION_INT >= FFMPEG_VERSION_3_1
     info_.codecpar = p_format_ctx_->streams[video_index_]->codecpar;
-    #else
-    info_.codec_ctx = p_format_ctx_->streams[video_index_]->codec;
-    #endif
+
     /*
     * At this moment, if the demuxer does not set this value (avctx->field_order == UNKNOWN),
     * the input stream will be assumed as progressive one.
@@ -166,13 +181,9 @@ bool VideoParser::Open(const char *url, bool save_file) {
     }
 
     // get extra data
-    #if LIBAVFORMAT_VERSION_INT >= FFMPEG_VERSION_3_1
     uint8_t* extradata = vstream->codecpar->extradata;
     int extradata_size = vstream->codecpar->extradata_size;
-    #else
-    uint8_t* extradata = vstream->codec->extradata;
-    int extradata_size = vstream->codec->extradata_size;
-    #endif
+
     info_.extra_data = std::vector<uint8_t>(extradata, extradata + extradata_size);
 
     if (vstream->avg_frame_rate.den) {
@@ -331,6 +342,9 @@ bool VideoParser::isRecoverableError(int error_code) {
             return false;
     }
 }
+
+
+
 
 }
  
