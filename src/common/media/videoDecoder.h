@@ -1,7 +1,7 @@
 
 #pragma once
 
-#include "videoDecoderImpl.h"
+#include "videoDecoderInterface.h"
 
 
 namespace emai {
@@ -49,7 +49,7 @@ public:
 
 private:
     VideoInfo                 info_;
-    VideoDecoderImpl::uPtr    impl_{nullptr};
+    VideoDecoderInterface::uPtr    impl_{nullptr};
 
     int                       device_id_;
     bool                      send_eos_{false};

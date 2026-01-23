@@ -38,12 +38,12 @@ public:
     virtual void onDecodeFrame(AVFrame* frame, const int64_t frmIndex) = 0;
 };
 
-class VideoDecoderImpl {
+class VideoDecoderInterface {
 public:
-    using Ptr =  std::shared_ptr<VideoDecoderImpl>;
-    using uPtr =  std::unique_ptr<VideoDecoderImpl>;
+    using Ptr =  std::shared_ptr<VideoDecoderInterface>;
+    using uPtr =  std::unique_ptr<VideoDecoderInterface>;
 
-    virtual ~VideoDecoderImpl() = default;
+    virtual ~VideoDecoderInterface() = default;
 
     virtual bool Init(const VideoInfo& info) = 0;
     virtual int unInit() = 0;

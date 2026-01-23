@@ -4,6 +4,8 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <chrono>
+#include <iomanip>
 
 namespace emai {
  
@@ -61,12 +63,37 @@ public:
     }
     
 private:
+    #if 0
     std::string getCurrentTime() {
         time_t now = time(nullptr);
         char buf[80];
         strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", localtime(&now));
         return std::string(buf);
     }
+    #else
+    std::string getCurrentTime() {
+        // 获取当前时间点
+        auto now = std::chrono::system_clock::now();
+        
+        // 转换为time_t（秒级精度）
+        auto now_time_t = std::chrono::system_clock::to_time_t(now);
+        
+        // 转换为tm结构体（本地时间）
+        auto now_tm = std::localtime(&now_time_t);
+        
+        // 获取毫秒部分
+        auto now_ms = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now.time_since_epoch()
+        ) % 1000;
+        
+        // 使用stringstream格式化输出
+        std::ostringstream oss;
+        oss << std::put_time(now_tm, "%Y-%m-%d %H:%M:%S");
+        oss << '.' << std::setfill('0') << std::setw(3) << now_ms.count();
+        
+        return oss.str();
+    }
+    #endif
 
     LogLevel level_;
     const char* file_;

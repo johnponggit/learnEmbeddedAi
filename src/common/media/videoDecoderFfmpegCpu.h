@@ -2,8 +2,8 @@
 #pragma once
 
 #include "util.h"
-#include "videoDecoderImpl.h"
-#include "jpegEncoderImpl.h"
+#include "videoDecoderInterface.h"
+#include "jpegEncoderInterface.h"
 
 namespace emai {
 
@@ -11,7 +11,7 @@ namespace emai {
 
 const std::string kSavedTmpPicDir = "./tmpPic/";
 
-class VideoDecoderFfmpegCpu : public VideoDecoderImpl {
+class VideoDecoderFfmpegCpu : public VideoDecoderInterface {
 public:
     VideoDecoderFfmpegCpu(IDecodeEventHandle::wPtr handle, bool decodeDebugEn = false);
     ~VideoDecoderFfmpegCpu();
@@ -36,7 +36,7 @@ private:
     AVCodecContext*          decode_{nullptr};
     AVFrame                 *av_frame_ = nullptr;
 
-    JpegEncoderImpl::Ptr     jpegEncoder_{nullptr};
+    JpegEncoderInterface::Ptr     jpegEncoder_{nullptr};
     
     IDecodeEventHandle::wPtr handle_;
 

@@ -149,6 +149,42 @@ struct YUVFrame {
     bool empty() const {
         return width == 0 || height == 0 || y_plane.empty();
     }
+
+    // 将YUV转换为RGB，用于模型输入
+    std::vector<uint8_t> to_rgb() const {
+        if (empty() || format != AV_PIX_FMT_YUV420P) {
+            return {};
+        }
+        
+        std::vector<uint8_t> rgb_data(width * height * 3);
+        
+        // 简单的YUV420P到RGB转换
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                // 获取YUV值
+                uint8_t Y = y_plane[y * y_stride + x];
+                uint8_t U = u_plane[(y/2) * uv_stride + (x/2)];
+                uint8_t V = v_plane[(y/2) * uv_stride + (x/2)];
+                
+                // YUV到RGB转换
+                int r = Y + 1.402 * (V - 128);
+                int g = Y - 0.344 * (U - 128) - 0.714 * (V - 128);
+                int b = Y + 1.772 * (U - 128);
+                
+                // 限制到0-255范围
+                r = r < 0 ? 0 : (r > 255 ? 255 : r);
+                g = g < 0 ? 0 : (g > 255 ? 255 : g);
+                b = b < 0 ? 0 : (b > 255 ? 255 : b);
+                
+                int idx = (y * width + x) * 3;
+                rgb_data[idx] = r;
+                rgb_data[idx + 1] = g;
+                rgb_data[idx + 2] = b;
+            }
+        }
+        
+        return rgb_data;
+    }
 };
 
 // YUV帧缓冲区
@@ -157,7 +193,7 @@ private:
     std::queue<emai::YUVFrame>    frames;
     std::mutex              mtx;                  // 互斥锁
     std::condition_variable cv;                   // 条件变量
-    size_t                  max_size = 25;        // 缓冲区最大大小
+    size_t                  max_size = 100;        // 缓冲区最大大小
     std::atomic<bool>       has_new_frame{false}; // 标记是否有新帧
     
 public:
@@ -169,6 +205,8 @@ public:
             frames.pop();
         }
         
+        LOG_DEBUG("push frame, size: " << frames.size()); 
+
         frames.push(frame);
         has_new_frame = true;
         cv.notify_one();  // 通知等待的线程

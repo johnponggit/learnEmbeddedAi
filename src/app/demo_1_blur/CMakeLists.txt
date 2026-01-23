@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.1)
 
-project(demo_blur)
+project(demo_1_blur)
 
 file(GLOB_RECURSE SRC_FILES "*.cpp")
 file(GLOB_RECURSE INC_FILES "*.h")
@@ -36,7 +36,7 @@ target_include_directories( ${PROJECT_NAME} PRIVATE
 target_link_directories(${PROJECT_NAME} PRIVATE 
                         ${THIRD_DIR}/OpenSSL/lib/${PLAT_FORM} 
                         ${THIRD_DIR}/ffmpeg/lib/${FFMPEG_LIB_TYPE}
-                        ${THIRD_DIR}/rk/lib/${PLAT_FORM}/
+                        ${THIRD_DIR}/rockchip/rk/lib/${PLAT_FORM}/
                         )
 
 target_link_libraries(${PROJECT_NAME}     

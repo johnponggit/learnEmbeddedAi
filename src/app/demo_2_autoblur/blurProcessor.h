@@ -6,7 +6,7 @@
 #include "json.hpp"
 
 #include "mediaDataStruct.h"
-#include "jpegEncoderImpl.h"
+#include "jpegEncoderInterface.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -20,7 +20,8 @@ extern "C" {
 
 // 模糊处理器
 class BlurProcessor {
-   
+public:
+  
 // 模糊区域设置
 struct BlurSettings {
     int x = 100;            // 模糊区域左上角X坐标（对于圆形，是圆心X坐标）
@@ -30,10 +31,9 @@ struct BlurSettings {
     int blur_radius = 5;    // 模糊半径
     int border_size = 2;    // 边框大小
     bool enabled = true;    // 是否启用模糊
-    std::string shape = "circle"; // 模糊形状: "circle" 或 "rectangle"
-} blur_settings;
+    std::string shape = "rectangle"; // 模糊形状: "circle" 或 "rectangle"
+};
     
-public:
     BlurProcessor();    
     ~BlurProcessor();
     
@@ -41,13 +41,15 @@ public:
     std::vector<uint8_t> process_and_encode(emai::YUVFrame& input_yuv);
     
     // 更新模糊设置
+    void update_blur_settings(const BlurSettings &blurSettings);
     void update_blur_settings(int x, int y, int width, int height,
                              int blur_radius = 5, int border_size = 2,
                              bool enabled = true, const std::string& shape = "circle");
     
     // 获取当前设置
     BlurSettings get_settings() ;
-    
+    void getDstWidthHeight(int& width, int& height);
+  
 private:
     // 准备输出帧
     bool prepare_output_frame(emai::YUVFrame& input_yuv);
@@ -57,9 +59,6 @@ private:
     
     // 对帧的选定区域应用高斯模糊效果
     void apply_blur_to_frame();
-    
-    // 对圆形区域应用模糊
-    void apply_circular_blur_to_frame();
     
     // 对矩形区域应用模糊
     void apply_rectangular_blur_to_frame();
@@ -76,10 +75,11 @@ private:
     // 为区域添加边框
     void add_border_to_region() ;
 
+
 private:
     std::mutex processor_mutex;
         
-    emai::JpegEncoderImpl::Ptr     jpegEncoder_{nullptr};
+    emai::JpegEncoderInterface::Ptr     jpegEncoder_{nullptr};
 
     // 用于图像缩放
     SwsContext* sws_ctx = nullptr;
@@ -89,7 +89,10 @@ private:
     
     // 高斯模糊内核
     std::vector<float> gaussian_kernel;
+    BlurSettings blur_settings;
 
+    int                    dst_width = 800;
+    int                    dst_height = 600;
 };
 
 

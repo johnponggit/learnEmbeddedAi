@@ -13,6 +13,13 @@ include_directories(
     ${THIRD_DIR}/nlohmann/include/
 )
 
+# rk平台相关
+if (PLAT_FORM STREQUAL "rv1126")  
+include_directories(
+    ${THIRD_DIR}/rockchip/rga/include/
+    ${THIRD_DIR}/rockchip/librknn_api/include/
+)
+endif()
 
 
 file(GLOB_RECURSE SRC_FILES "*.cpp")
