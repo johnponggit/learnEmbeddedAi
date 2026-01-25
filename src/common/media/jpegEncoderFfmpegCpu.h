@@ -1,11 +1,11 @@
 
 #pragma once
 
-#include "jpegEncoderInterface.h"
+#include "IJpegEncoder.h"
 
 namespace emai {
 
-class JpegEncoderFfmpegCpu : public JpegEncoderInterface {
+class JpegEncoderFfmpegCpu : public IJpegEncoder {
 public:
     using Ptr =  std::shared_ptr<JpegEncoderFfmpegCpu>;
     using uPtr =  std::unique_ptr<JpegEncoderFfmpegCpu>;

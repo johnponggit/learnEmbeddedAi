@@ -7,7 +7,7 @@
 #include "rknnPostprocess.h"
 #include "mediaDataStruct.h"
 
-#include "jpegEncoderInterface.h"
+#include "IJpegEncoder.h"
 
 namespace emai
 {
@@ -56,7 +56,7 @@ private:
     bool                          initOk = false;
 
     bool                          debugEn_ = false; 
-    JpegEncoderInterface::Ptr     jpegEncoder_{nullptr};
+    IJpegEncoder::Ptr             jpegEncoder_{nullptr};
 
 };
 }

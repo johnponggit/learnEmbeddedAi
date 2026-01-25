@@ -3,8 +3,8 @@
 
 #include "videoParser.h"
 #include "videoDecoder.h"
-#include "blurProcessor.h"
 #include "rknnYolov5Detector.h"
+#include "mosaicProcessor.h"
 
 class DecoderManager : public std::enable_shared_from_this<DecoderManager>, public emai::IDecodeEventHandle
 {    
@@ -21,16 +21,16 @@ public:
     void stop_all();
     
     // 获取处理后的JPEG帧
-    bool get_processed_frame(std::vector<uint8_t>& frame);
-    
-    // 更新模糊设置
-    bool update_blur_settings(int x, int y, int width, int height,
-                             int blur_radius = 5, int border_size = 2,
-                             bool enabled = true, const std::string& shape = "circle");
-    BlurProcessor::BlurSettings getBlurSettings();
+    bool get_processed_frame(std::vector<uint8_t>& frame);    
+
    
+    int  updateMosaicSettingsByDetect(const emai::YUVFrame& frame);
+
+    bool update_mosaic_settings(int x, int y, int width, int height, int block_size = 16, int border_size = 2, bool enabled = true);
+    std::string get_mosaic_settings_json();
+    MosaicProcessor::MosaicSettings getMosaicSettings();
+
     // 获取当前设置
-    std::string get_blur_settings_json();    
     std::string get_current_url();    
     bool        is_streaming();
 
@@ -65,9 +65,8 @@ private:
     std::unique_ptr<std::queue<std::vector<uint8_t>>> jpegBuffer_;
     std::mutex                                        jpegBufferMutex_;
     
-    // 模糊处理器
-    std::unique_ptr<BlurProcessor>                    blurProcessor_{nullptr};  
-    
+    MosaicProcessor::Ptr                              mosaicProcessor_{nullptr};
+
     std::unique_ptr<emai::RknnYolov5Detector>         detector_{nullptr};
     
     // 性能统计
@@ -79,6 +78,5 @@ private:
     int                                               dst_width_{800};
     int                                               dst_height_{600};
     std::string                                       enLabel_ = "person";
-
 };
 

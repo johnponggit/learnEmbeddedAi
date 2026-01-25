@@ -4,13 +4,13 @@
 
 DecoderManager::DecoderManager() : decodedFrameBuffer_(std::make_unique<emai::YUVFrameBuffer>()),
                                    jpegBuffer_(std::make_unique<std::queue<std::vector<uint8_t>>>()), 
-                                   blurProcessor_(std::make_unique<BlurProcessor>()) 
+                                   mosaicProcessor_(std::make_unique<MosaicProcessor>()) 
                                 {
     lastStatTime_ = av_gettime() / 1000;
 
-    if (blurProcessor_)
+    if (mosaicProcessor_)
     {
-        blurProcessor_->getDstWidthHeight(dst_width_, dst_height_);
+        mosaicProcessor_->getDstWidthHeight(dst_width_, dst_height_);
     }
 
     detector_ = std::make_unique<emai::RknnYolov5Detector>();
@@ -179,10 +179,11 @@ bool DecoderManager::get_processed_frame(std::vector<uint8_t>& frame) {
     return false;
 }
     
-bool DecoderManager::update_blur_settings(int x, int y, int width, int height, int blur_radius, int border_size,
-                                          bool enabled, const std::string& shape) {
+
+
+bool DecoderManager::update_mosaic_settings(int x, int y, int width, int height, int block_size, int border_size, bool enabled) {
     std::lock_guard<std::mutex> lock(managerMutex_);
-    if (!blurProcessor_) return false;
+    if (!mosaicProcessor_) return false;
     
     if (width <= 0 || height <= 0 || width > 800 || height > 600) {
         return false;
@@ -192,27 +193,27 @@ bool DecoderManager::update_blur_settings(int x, int y, int width, int height, i
         return false;
     }
     
-    blurProcessor_->update_blur_settings(x, y, width, height,
-                                        blur_radius, border_size, enabled, shape);
+    mosaicProcessor_->update_mosaic_settings(x, y, width, height, block_size, border_size, enabled);
     return true;
 }
     
-std::string DecoderManager::get_blur_settings_json() 
+
+
+std::string DecoderManager::get_mosaic_settings_json() 
 {
     std::lock_guard<std::mutex> lock(managerMutex_);
-    if (!blurProcessor_) return "{}";
+    if (!mosaicProcessor_) return "{}";
     
-    auto settings = blurProcessor_->get_settings();
+    auto settings = mosaicProcessor_->get_settings();
     std::stringstream ss;
     ss << "{";
     ss << "\"x\":" << settings.x << ",";
     ss << "\"y\":" << settings.y << ",";
     ss << "\"width\":" << settings.width << ",";
     ss << "\"height\":" << settings.height << ",";
-    ss << "\"blur_radius\":" << settings.blur_radius << ",";
+    ss << "\"block_size\":" << settings.block_size << ",";
     ss << "\"border_size\":" << settings.border_size << ",";
-    ss << "\"enabled\":" << (settings.enabled ? "true" : "false") << ",";
-    ss << "\"shape\":\"" << settings.shape << "\"";
+    ss << "\"enabled\":" << (settings.enabled ? "true" : "false");
     ss << "}";
     return ss.str();
 }
@@ -262,11 +263,11 @@ void DecoderManager::processing_loop()
         std::vector<uint8_t> processed_frame;
         
         if (has_frame) {
-            updateBlurSettingsByDetect(frame);    
+            updateMosaicSettingsByDetect(frame);    
 
-            // 处理帧：应用模糊
+            // 处理帧：应用马赛克
             auto start = std::chrono::high_resolution_clock::now();
-            processed_frame = blurProcessor_->process_and_encode(frame);
+            processed_frame = mosaicProcessor_->process_and_encode(frame);
             auto end = std::chrono::high_resolution_clock::now();
             LOG_DEBUG("Processing frame done, time: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms");
 
@@ -371,7 +372,9 @@ void DecoderManager::onDecodeFrame(AVFrame* frame, const int64_t frmIndex) {
 }
     
 
-int DecoderManager::updateBlurSettingsByDetect(const emai::YUVFrame& frame)
+
+
+int DecoderManager::updateMosaicSettingsByDetect(const emai::YUVFrame& frame)
 {
     int iRet = -1;
 
@@ -429,13 +432,17 @@ int DecoderManager::updateBlurSettingsByDetect(const emai::YUVFrame& frame)
 
         LOG_INFO("bestProp: " << bestProp << ", bestBox: (" << bestBox.left << " " << bestBox.top << " " << bestBox.right << " " << bestBox.bottom << ")");
 
-        if (!blurProcessor_)
+        if (!mosaicProcessor_)
         {
-            LOG_ERROR("blurProcessor is null");
+            LOG_ERROR("mosaicProcessor is null");
             return iRet;
         }
 
-        auto settings = blurProcessor_->get_settings();
+        auto settings = mosaicProcessor_->get_settings();
+
+        LOG_INFO("current mosaic settings: (" << settings.x << "," << settings.y << ") " << settings.width << "x" << settings.height <<
+                ", enabled: " << settings.enabled << ")" << ",bestBox: (" << bestBox.left << " " << bestBox.top << ") width: " << 
+                (bestBox.right - bestBox.left) << ", height: " << (bestBox.bottom - bestBox.top));
 
         if ((settings.x != bestBox.left) || (settings.y != bestBox.top) ||
             settings.width != (bestBox.right - bestBox.left) ||
@@ -446,20 +453,22 @@ int DecoderManager::updateBlurSettingsByDetect(const emai::YUVFrame& frame)
             settings.width = bestBox.right - bestBox.left;
             settings.height = bestBox.bottom - bestBox.top;
 
-            LOG_INFO("Updating blur settings: (" << settings.x << "," << settings.y << ") " 
+            LOG_INFO("Updating mosaic settings: (" << settings.x << "," << settings.y << ") " 
                 << settings.width << "x" << settings.height);
-            blurProcessor_->update_blur_settings(settings);
+            mosaicProcessor_->update_mosaic_settings(settings);
         }
     }
 
     return iRet;
 }
 
-BlurProcessor::BlurSettings DecoderManager::getBlurSettings()
+
+MosaicProcessor::MosaicSettings DecoderManager::getMosaicSettings()
 {
-    return blurProcessor_->get_settings();
+    return mosaicProcessor_->get_settings();
 
 }
+
 
 
 

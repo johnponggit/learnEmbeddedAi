@@ -15,12 +15,12 @@
 
 namespace emai {
 
-class JpegEncoderInterface {
+class IJpegEncoder {
 public:
-    using Ptr =  std::shared_ptr<JpegEncoderInterface>;
-    using uPtr =  std::unique_ptr<JpegEncoderInterface>;
+    using Ptr =  std::shared_ptr<IJpegEncoder>;
+    using uPtr =  std::unique_ptr<IJpegEncoder>;
 
-    virtual ~JpegEncoderInterface() = default;
+    virtual ~IJpegEncoder() = default;
 
     virtual bool Init(const int width, const int height) = 0;
     virtual int  unInit() = 0;

@@ -6,7 +6,7 @@
 #include "json.hpp"
 
 #include "mediaDataStruct.h"
-#include "jpegEncoderInterface.h"
+#include "IJpegEncoder.h"
 
 extern "C" {
 #include <libavcodec/avcodec.h>
@@ -79,7 +79,7 @@ private:
 private:
     std::mutex processor_mutex;
         
-    emai::JpegEncoderInterface::Ptr     jpegEncoder_{nullptr};
+    emai::IJpegEncoder::Ptr     jpegEncoder_{nullptr};
 
     // 用于图像缩放
     SwsContext* sws_ctx = nullptr;

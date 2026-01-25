@@ -25,7 +25,7 @@ VideoDecoder::VideoDecoder(IDecodeEventHandle::wPtr handle, DecoderType type, in
     }
 
     if (!impl_) {
-        LOG_ERROR("create VideoDecoderInterface failed");
+        LOG_ERROR("create IVideoDecoder failed");
     }
 }
  
