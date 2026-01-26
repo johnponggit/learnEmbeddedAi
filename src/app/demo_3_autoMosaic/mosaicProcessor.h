@@ -22,10 +22,10 @@ class MosaicProcessor {
 public:
     // 马赛克区域设置
     struct MosaicSettings {
-        int x = 100;            // 马赛克区域左上角X坐标
-        int y = 100;            // 马赛克区域左上角Y坐标
-        int width = 200;        // 马赛克区域宽度
-        int height = 150;       // 马赛克区域高度
+        int x = 0;              // 马赛克区域左上角X坐标
+        int y = 0;              // 马赛克区域左上角Y坐标
+        int width = 0;          // 马赛克区域宽度
+        int height = 0;         // 马赛克区域高度
         int block_size = 16;    // 马赛克块大小
         int border_size = 2;    // 边框大小
         bool enabled = true;    // 是否启用马赛克
@@ -72,7 +72,7 @@ private:
     // 临时帧
     AVFrame* output_frame = nullptr;
 
-    int                    dst_width = 900;
+    int                    dst_width = 800;
     int                    dst_height = 600;
     
 };

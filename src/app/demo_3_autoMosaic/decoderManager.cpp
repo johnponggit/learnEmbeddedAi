@@ -400,6 +400,14 @@ int DecoderManager::updateMosaicSettingsByDetect(const emai::YUVFrame& frame)
         if (detectResultGroup.count <= 0)
         {
             LOG_INFO("No detection results");
+
+            auto settings = mosaicProcessor_->get_settings();
+            settings.x = 0;
+            settings.y = 0;
+            settings.width = 0;
+            settings.height = 0;
+            mosaicProcessor_->update_mosaic_settings(settings);
+            LOG_INFO("No detection results, mosaic settings reset");
             return iRet;
         }
 
