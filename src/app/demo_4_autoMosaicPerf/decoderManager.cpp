@@ -47,7 +47,8 @@ int DecoderManager::start_stream(const std::string& rtsp_url)
     decodedFrameBuffer_->clear();
 
     LOG_INFO("Creating VideoDecoder type: FFMPEG_CPU");
-    decoder_ = std::make_shared<emai::VideoDecoder>(shared_from_this(), emai::FFMPEG_CPU, -1); 
+    // decoder_ = std::make_shared<emai::VideoDecoder>(shared_from_this(), emai::FFMPEG_CPU, -1); 
+    decoder_ = std::make_shared<emai::VideoDecoder>(shared_from_this(), emai::FFMPEG_RKMPP, -1); 
     if (!decoder_)
     {
         LOG_ERROR("create VideoDecoder failed");

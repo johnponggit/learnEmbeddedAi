@@ -6,6 +6,8 @@
  
 #include "videoDecoder.h"
 #include "videoDecoderFfmpegCpu.h"
+#include "videoDecoderFfmpegRkmpp.h"
+
 #include "util.h"
 
 namespace emai{
@@ -17,6 +19,10 @@ VideoDecoder::VideoDecoder(IDecodeEventHandle::wPtr handle, DecoderType type, in
     switch (type) {
         case FFMPEG_CPU:
             impl_ = std::make_unique<VideoDecoderFfmpegCpu>(handle, false);
+            break;
+
+        case FFMPEG_RKMPP:
+            impl_ = std::make_unique<VideoDecoderFfmpegRkmpp>(handle, true);
             break;
 
         default:

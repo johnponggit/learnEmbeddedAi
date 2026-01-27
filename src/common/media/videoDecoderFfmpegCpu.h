@@ -7,10 +7,6 @@
 
 namespace emai {
 
-
-
-const std::string kSavedTmpPicDir = "./tmpPic/";
-
 class VideoDecoderFfmpegCpu : public IVideoDecoder {
 public:
     VideoDecoderFfmpegCpu(IDecodeEventHandle::wPtr handle, bool decodeDebugEn = false);
@@ -33,6 +29,8 @@ private:
     
 
 private:
+    const std::string kSavedTmpPicDir = "./tmpPic/";
+
     AVCodecContext*          decode_{nullptr};
     AVFrame                 *av_frame_ = nullptr;
 

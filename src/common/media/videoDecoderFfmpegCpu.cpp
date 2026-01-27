@@ -108,6 +108,8 @@ bool VideoDecoderFfmpegCpu::FeedPacket(const AVPacket* pkt, const int64_t frmInd
         return false;
     }
 
+    auto start = std::chrono::high_resolution_clock::now();
+
     int err = avcodec_send_packet(decode_, pkt);
     if (err != AVERROR(EAGAIN) && err != AVERROR_EOF && err < 0) {
         LOG_ERROR("avcodec_send_packet, err:" << err << ", EAGAIN:" << AVERROR(EAGAIN) << ", AVERROR_EOF:" << AVERROR_EOF);
@@ -139,11 +141,14 @@ bool VideoDecoderFfmpegCpu::FeedPacket(const AVPacket* pkt, const int64_t frmInd
                 LOG_ERROR("avframe err, width:" << av_frame_->width << ",height:" << av_frame_->height);
                 continue;
             }
-
+            
+            auto end = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
             LOG_DEBUG("VideoDecoderFfmpegCpu FeedPacket: Got decoded frame, pts=" << av_frame_->pts
                          << ", format=" << av_frame_->format
                          << ", width=" << av_frame_->width
-                         << ", height=" << av_frame_->height);
+                         << ", height=" << av_frame_->height
+                         << ", duration=" << duration << " ms");
             
             ProcessFrame(av_frame_, frmIndex);
         }
