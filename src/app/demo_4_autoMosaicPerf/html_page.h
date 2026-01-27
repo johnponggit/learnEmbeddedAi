@@ -58,21 +58,34 @@ const std::string HTML_PAGE = R"====(
             
             .content {
                 padding: 30px;
-                display: grid;
-                grid-template-columns: 2fr 1fr;
+                display: flex;
                 gap: 30px;
             }
             
             @media (max-width: 1200px) {
                 .content {
-                    grid-template-columns: 1fr;
+                    flex-direction: column;
                 }
             }
             
-            .main-content {
+            .left-panel {
+                flex: 1;
                 display: flex;
                 flex-direction: column;
-                gap: 30px;
+                gap: 20px;
+            }
+            
+            .right-panel {
+                width: 420px;
+                display: flex;
+                flex-direction: column;
+                gap: 20px;
+            }
+            
+            @media (max-width: 1200px) {
+                .right-panel {
+                    width: 100%;
+                }
             }
             
             .video-section {
@@ -130,7 +143,7 @@ const std::string HTML_PAGE = R"====(
             }
             
             .status-container {
-                margin-top: 20px;
+                margin-top: 15px;
             }
             
             .status-box {
@@ -268,191 +281,232 @@ const std::string HTML_PAGE = R"====(
                 box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
             }
             
-            .blur-controls {
-                background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
-                padding: 30px;
-                border-radius: 15px;
-                border: 2px solid #4b6cb7;
-                box-shadow: 0 5px 15px rgba(75, 108, 183, 0.1);
-                text-align: center;
+            .compact-controls {
                 display: flex;
-                flex-direction: column;
+                gap: 15px;
                 align-items: center;
-                justify-content: center;
-                min-height: 200px;
+                justify-content: space-between;
+                padding: 18px 20px;
+                background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+                border-radius: 12px;
+                border: 2px solid #e3e6f0;
+                flex-wrap: wrap;
+                box-shadow: 0 2px 12px rgba(75, 108, 183, 0.08);
+                transition: all 0.3s ease;
             }
             
-            .blur-controls .panel-title {
+            .compact-controls:hover {
+                box-shadow: 0 4px 16px rgba(75, 108, 183, 0.12);
+                border-color: #4b6cb7;
+            }
+            
+            .compact-toggle {
+                display: flex;
+                align-items: center;
+                gap: 15px;
+                flex: 1;
+            }
+            
+            .toggle-label-text {
+                font-size: 15px;
+                font-weight: 600;
+                color: #2c3e50;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                user-select: none;
+            }
+            
+            .toggle-icon {
+                font-size: 22px;
                 color: #4b6cb7;
-                justify-content: center;
-                margin-bottom: 30px;
             }
             
-            .blur-toggle-container {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                gap: 20px;
-                width: 100%;
-            }
-            
-            .toggle-switch {
+            .mini-toggle-switch {
                 position: relative;
                 display: inline-block;
-                width: 80px;
-                height: 40px;
+                width: 60px;
+                height: 32px;
             }
             
-            .toggle-switch input {
+            .mini-toggle-switch input {
                 opacity: 0;
                 width: 0;
                 height: 0;
             }
             
-            .toggle-slider {
+            .mini-toggle-slider {
                 position: absolute;
                 cursor: pointer;
                 top: 0;
                 left: 0;
                 right: 0;
                 bottom: 0;
-                background-color: #ccc;
+                background: linear-gradient(135deg, #cbd5e0 0%, #a0aec0 100%);
                 transition: .4s;
-                border-radius: 40px;
-                box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.2);
+                border-radius: 32px;
+                box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
             }
             
-            .toggle-slider:before {
+            .mini-toggle-slider:before {
                 position: absolute;
                 content: "";
-                height: 32px;
-                width: 32px;
-                left: 4px;
-                bottom: 4px;
-                background-color: white;
+                height: 26px;
+                width: 26px;
+                left: 3px;
+                bottom: 3px;
+                background: white;
                 transition: .4s;
                 border-radius: 50%;
-                box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
             }
             
-            input:checked + .toggle-slider {
-                background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            input:checked + .mini-toggle-slider {
+                background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+                box-shadow: 0 0 12px rgba(72, 187, 120, 0.4);
             }
             
-            input:checked + .toggle-slider:before {
-                transform: translateX(40px);
+            input:checked + .mini-toggle-slider:before {
+                transform: translateX(28px);
             }
             
-            .toggle-label {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 10px;
-                font-weight: 600;
-                color: #495057;
-                font-size: 18px;
-            }
-            
-            .toggle-status {
-                font-size: 14px;
-                color: #6c757d;
-                margin-top: 5px;
-            }
-            
-            .toggle-status.enabled {
-                color: #28a745;
-                font-weight: 600;
-            }
-            
-            .toggle-status.disabled {
-                color: #dc3545;
-                font-weight: 600;
-            }
-            
-            .auto-apply-note {
-                font-size: 12px;
-                color: #28a745;
-                padding: 10px;
-                background: #e7f5ff;
-                border-radius: 8px;
-                text-align: center;
-                margin-top: 20px;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                gap: 5px;
+            .mini-toggle-slider:after {
+                content: '';
+                position: absolute;
                 width: 100%;
+                height: 100%;
+                border-radius: 32px;
+                background: transparent;
+                transition: .4s;
+            }
+            
+            input:checked + .mini-toggle-slider:after {
+                background: rgba(72, 187, 120, 0.1);
+            }
+            
+            .compact-status {
+                font-size: 14px;
+                padding: 6px 14px;
+                border-radius: 20px;
+                font-weight: 600;
+                display: inline-flex;
+                align-items: center;
+                gap: 6px;
+                transition: all 0.3s ease;
+            }
+            
+            .compact-status.enabled {
+                color: #22543d;
+                background: linear-gradient(135deg, #c6f6d5 0%, #9ae6b4 100%);
+                border: 1px solid #9ae6b4;
+            }
+            
+            .compact-status.disabled {
+                color: #742a2a;
+                background: linear-gradient(135deg, #fed7d7 0%, #fc8181 100%);
+                border: 1px solid #fc8181;
+            }
+            
+            .status-dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                display: inline-block;
+            }
+            
+            .status-dot.enabled {
+                background: #38a169;
+                box-shadow: 0 0 8px rgba(56, 161, 105, 0.6);
+                animation: pulseGreen 2s infinite;
+            }
+            
+            .status-dot.disabled {
+                background: #e53e3e;
+            }
+            
+            @keyframes pulseGreen {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.6; }
             }
             
             .perf-board {
                 display: flex;
-                align-items: center;
-                justify-content: space-between;
+                flex-direction: column;
+                gap: 15px;
                 padding: 25px;
                 background: white;
                 border-radius: 15px;
                 box-shadow: 0 10px 25px rgba(0,0,0,0.05);
-                margin-top: 30px;
-                flex-wrap: wrap;
-                gap: 10px;
                 border: 1px solid #e9ecef;
             }
             
-            .perf-node {
-                flex: 1;
-                min-width: 130px;
-                background: #f8f9fa;
-                border-radius: 12px;
-                padding: 15px;
-                text-align: center;
-                border: 1px solid #dee2e6;
-                transition: all 0.3s ease;
+            .perf-board-title {
+                font-size: 20px;
+                font-weight: 600;
+                color: #495057;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                margin-bottom: 10px;
+                padding-bottom: 15px;
+                border-bottom: 2px solid #e9ecef;
+            }
+            
+            .perf-flow {
                 display: flex;
                 flex-direction: column;
-                justify-content: center;
-                height: 100px;
+                gap: 12px;
+            }
+            
+            .perf-node {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                background: #f8f9fa;
+                border-radius: 10px;
+                padding: 12px 18px;
+                border-left: 4px solid #4b6cb7;
+                transition: all 0.3s ease;
+                min-height: 60px;
             }
             
             .perf-node:hover {
-                transform: translateY(-5px);
-                box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-                border-color: #4b6cb7;
+                transform: translateX(5px);
+                box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+                background: white;
             }
             
             .perf-label {
-                font-size: 12px;
-                color: #868e96;
-                margin-bottom: 8px;
+                font-size: 13px;
+                color: #6c757d;
                 font-weight: 600;
-                text-transform: uppercase;
-                letter-spacing: 0.5px;
+                display: flex;
+                align-items: center;
+                gap: 8px;
             }
             
             .perf-value {
-                font-size: 20px;
+                font-size: 18px;
                 font-weight: bold;
                 color: #2c3e50;
                 font-family: 'Consolas', 'Monaco', monospace;
+                min-width: 80px;
+                text-align: right;
             }
             
             .perf-arrow {
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                margin: -5px 0;
                 color: #adb5bd;
-                animation: flowArrow 2s infinite;
+                animation: flowArrowVertical 2s infinite;
             }
             
-            @keyframes flowArrow {
-                0% { transform: translateX(0); opacity: 0.5; }
-                50% { transform: translateX(5px); opacity: 1; }
-                100% { transform: translateX(0); opacity: 0.5; }
-            }
-            
-            .perf-node.active {
-                background: white;
-                border-left: 4px solid #4b6cb7;
+            @keyframes flowArrowVertical {
+                0% { transform: translateY(0); opacity: 0.5; }
+                50% { transform: translateY(3px); opacity: 1; }
+                100% { transform: translateY(0); opacity: 0.5; }
             }
             
             .perf-node.highlight-red {
@@ -460,9 +514,22 @@ const std::string HTML_PAGE = R"====(
                 background: #fff5f5;
             }
             
+            .perf-node.highlight-red .perf-value {
+                color: #dc3545;
+            }
+            
             .perf-node.highlight-green {
                 border-left: 4px solid #28a745;
                 background: #f8fff9;
+            }
+            
+            .perf-node.highlight-green .perf-value {
+                color: #28a745;
+            }
+            
+            .perf-icon {
+                font-size: 20px;
+                color: #4b6cb7;
             }
             
             .loading-overlay {
@@ -525,20 +592,6 @@ const std::string HTML_PAGE = R"====(
                 direction: ltr;
                 -webkit-font-smoothing: antialiased;
             }
-            
-            .blur-icon {
-                font-size: 48px;
-                margin-bottom: 15px;
-                color: #4b6cb7;
-            }
-            
-            .blur-icon.enabled {
-                color: #28a745;
-            }
-            
-            .blur-icon.disabled {
-                color: #dc3545;
-            }
         </style>
         <!-- Material Icons -->
         <link href="https://fonts.googleapis.com/icon?family=Material+Icons|Material+Icons+Outlined" rel="stylesheet">
@@ -551,7 +604,7 @@ const std::string HTML_PAGE = R"====(
             </div>
             
             <div class="content">
-                <div class="main-content">
+                <div class="left-panel">
                     <div class="video-section">
                         <div class="video-title">
                             <span class="material-icons-outlined">videocam</span>
@@ -572,6 +625,53 @@ const std::string HTML_PAGE = R"====(
                             <img id="video" src="" style="display: none;">
                         </div>
                         
+                        <!-- 紧凑的马赛克控制 -->
+                        <div class="compact-controls">
+                            <div class="compact-toggle">
+                                <div class="toggle-label-text">
+                                    <span class="material-icons toggle-icon">blur_on</span>
+                                    马赛克效果
+                                </div>
+                                <label class="mini-toggle-switch">
+                                    <input type="checkbox" id="blurEnabled" checked>
+                                    <span class="mini-toggle-slider"></span>
+                                </label>
+                            </div>
+                            <div class="compact-status enabled" id="compactStatus">
+                                <span class="status-dot enabled" id="statusDot"></span>
+                                已启用
+                            </div>
+                        </div>
+                        
+                        <!-- 视频流控制 -->
+                        <div class="control-panel">
+                            <div class="panel-title">
+                                <span class="material-icons">settings</span>
+                                <span>视频流控制</span>
+                            </div>
+                            
+                            <div class="input-group">
+                                <label>
+                                    <span class="material-icons-outlined" style="font-size: 18px;">videocam</span>
+                                    <span>RTSP地址</span>
+                                </label>
+                                <input type="text" 
+                                       id="rtspUrl" 
+                                       class="rtsp-input" 
+                                       placeholder="rtsp://username:password@ip:port/path"
+                                       value="rtsp://192.168.1.100:554/stream">
+                            </div>
+                            
+                            <button id="startBtn" class="btn btn-start" onclick="startStream()">
+                                <span class="material-icons">play_arrow</span>
+                                <span>开始播放</span>
+                            </button>
+                            <button id="stopBtn" class="btn btn-stop" onclick="stopStream()">
+                                <span class="material-icons">stop</span>
+                                <span>停止播放</span>
+                            </button>
+                        </div>
+                        
                         <div class="status-container">
                             <div class="status-box">
                                 <div class="status-title">
@@ -587,91 +687,81 @@ const std::string HTML_PAGE = R"====(
                         </div>
                     </div>
                     
-                    <div class="perf-board" id="perfBoard">
-                        <div class="perf-node active">
-                            <div class="perf-label">解码 (Decode)</div>
-                            <div class="perf-value" id="valDecode">-- ms</div>
-                        </div>
-                        <div class="perf-arrow"><span class="material-icons">arrow_forward</span></div>
-                        <div class="perf-node active">
-                            <div class="perf-label">检测 (Detect)</div>
-                            <div class="perf-value" id="valDetect">-- ms</div>
-                        </div>
-                        <div class="perf-arrow"><span class="material-icons">arrow_forward</span></div>
-                        <div class="perf-node active">
-                            <div class="perf-label">马赛克 (Mosaic)</div>
-                            <div class="perf-value" id="valMosaic">-- ms</div>
-                        </div>
-                        <div class="perf-arrow"><span class="material-icons">arrow_forward</span></div>
-                        <div class="perf-node active">
-                            <div class="perf-label">编码 (Encode)</div>
-                            <div class="perf-value" id="valEncode">-- ms</div>
-                        </div>
-                        <div class="perf-arrow"><span class="material-icons">double_arrow</span></div>
-                        <div class="perf-node highlight-red">
-                            <div class="perf-label" style="color: #dc3545;">总计 (Total)</div>
-                            <div class="perf-value" id="valTotal" style="color: #dc3545;">-- ms</div>
-                        </div>
-                        <div class="perf-node highlight-green">
-                            <div class="perf-label" style="color: #28a745;">帧率 (FPS)</div>
-                            <div class="perf-value" id="valFps" style="color: #28a745;">-- fps</div>
-                        </div>
-                    </div>
                 </div>
                 
+                <!-- 右侧性能统计看板 -->
                 <div class="right-panel">
-                    <div class="blur-controls">
-                        <div class="panel-title">
-                            <span class="material-icons">blur_on</span>
-                            <span>马赛克控制</span>
+                    <div class="perf-board">
+                        <div class="perf-board-title">
+                            <span class="material-icons">speed</span>
+                            <span>性能统计</span>
                         </div>
                         
-                        <div class="blur-toggle-container">
-                            <div id="blurIcon" class="blur-icon material-icons-outlined enabled">blur_on</div>
+                        <div class="perf-flow">
+                            <div class="perf-node">
+                                <div class="perf-label">
+                                    <span class="material-icons perf-icon">download</span>
+                                    解码 (Decode)
+                                </div>
+                                <div class="perf-value" id="valDecode">-- ms</div>
+                            </div>
                             
-                            <div class="toggle-label">
-                                <span>马赛克效果</span>
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="blurEnabled" checked>
-                                    <span class="toggle-slider"></span>
-                                </label>
-                                <div id="blurStatus" class="toggle-status enabled">已启用</div>
+                            <div class="perf-arrow">
+                                <span class="material-icons">arrow_downward</span>
+                            </div>
+                            
+                            <div class="perf-node">
+                                <div class="perf-label">
+                                    <span class="material-icons perf-icon">search</span>
+                                    检测 (Detect)
+                                </div>
+                                <div class="perf-value" id="valDetect">-- ms</div>
+                            </div>
+                            
+                            <div class="perf-arrow">
+                                <span class="material-icons">arrow_downward</span>
+                            </div>
+                            
+                            <div class="perf-node">
+                                <div class="perf-label">
+                                    <span class="material-icons perf-icon">blur_on</span>
+                                    马赛克 (Mosaic)
+                                </div>
+                                <div class="perf-value" id="valMosaic">-- ms</div>
+                            </div>
+                            
+                            <div class="perf-arrow">
+                                <span class="material-icons">arrow_downward</span>
+                            </div>
+                            
+                            <div class="perf-node">
+                                <div class="perf-label">
+                                    <span class="material-icons perf-icon">code</span>
+                                    编码 (Encode)
+                                </div>
+                                <div class="perf-value" id="valEncode">-- ms</div>
+                            </div>
+                            
+                            <div class="perf-arrow">
+                                <span class="material-icons" style="font-size: 28px;">keyboard_double_arrow_down</span>
+                            </div>
+                            
+                            <div class="perf-node highlight-red">
+                                <div class="perf-label" style="color: #dc3545;">
+                                    <span class="material-icons perf-icon" style="color: #dc3545;">timer</span>
+                                    总计 (Total)
+                                </div>
+                                <div class="perf-value" id="valTotal">-- ms</div>
+                            </div>
+                            
+                            <div class="perf-node highlight-green" style="margin-top: 10px;">
+                                <div class="perf-label" style="color: #28a745;">
+                                    <span class="material-icons perf-icon" style="color: #28a745;">speed</span>
+                                    帧率 (FPS)
+                                </div>
+                                <div class="perf-value" id="valFps">-- fps</div>
                             </div>
                         </div>
-                        
-                        <div class="auto-apply-note" id="autoApplyNote">
-                            <span class="material-icons-outlined" style="font-size: 14px;">autorenew</span>
-                            <span>设置已启用自动应用</span>
-                        </div>
-                    </div>
-                    
-                    <div class="control-panel">
-                        <div class="panel-title">
-                            <span class="material-icons">settings</span>
-                            <span>视频流控制</span>
-                        </div>
-                        
-                        <div class="input-group">
-                            <label>
-                                <span class="material-icons-outlined" style="font-size: 18px;">videocam</span>
-                                <span>RTSP地址</span>
-                            </label>
-                            <input type="text" 
-                                   id="rtspUrl" 
-                                   class="rtsp-input" 
-                                   placeholder="rtsp://username:password@ip:port/path"
-                                   value="rtsp://192.168.1.100:554/stream">
-                        </div>
-                        
-                        <button id="startBtn" class="btn btn-start" onclick="startStream()">
-                            <span class="material-icons">play_arrow</span>
-                            <span>开始播放</span>
-                        </button>
-                        <button id="stopBtn" class="btn btn-stop" onclick="stopStream()">
-                            <span class="material-icons">stop</span>
-                            <span>停止播放</span>
-                        </button>
-                        
                     </div>
                 </div>
             </div>
@@ -691,21 +781,17 @@ const std::string HTML_PAGE = R"====(
             
             // 更新马赛克控制UI状态
             function updateBlurUI(enabled) {
-                const blurIcon = document.getElementById('blurIcon');
-                const blurStatus = document.getElementById('blurStatus');
                 const blurEnabled = document.getElementById('blurEnabled');
+                const compactStatus = document.getElementById('compactStatus');
+                const statusDot = document.getElementById('statusDot');
                 
                 if (enabled) {
-                    blurIcon.className = 'blur-icon material-icons-outlined enabled';
-                    blurIcon.textContent = 'blur_on';
-                    blurStatus.textContent = '已启用';
-                    blurStatus.className = 'toggle-status enabled';
+                    compactStatus.innerHTML = '<span class="status-dot enabled" id="statusDot"></span> 已启用';
+                    compactStatus.className = 'compact-status enabled';
                     blurEnabled.checked = true;
                 } else {
-                    blurIcon.className = 'blur-icon material-icons-outlined disabled';
-                    blurIcon.textContent = 'blur_off';
-                    blurStatus.textContent = '已禁用';
-                    blurStatus.className = 'toggle-status disabled';
+                    compactStatus.innerHTML = '<span class="status-dot disabled" id="statusDot"></span> 已禁用';
+                    compactStatus.className = 'compact-status disabled';
                     blurEnabled.checked = false;
                 }
             }
@@ -946,12 +1032,6 @@ const std::string HTML_PAGE = R"====(
             function applyBlurSettings() {
                 const blurEnabled = document.getElementById('blurEnabled').checked;
                 
-                // 显示应用中的状态
-                const autoApplyNote = document.getElementById('autoApplyNote');
-                const originalText = autoApplyNote.innerHTML;
-                autoApplyNote.innerHTML = '<span class="material-icons-outlined" style="font-size: 14px;">sync</span> <span>正在应用设置...</span>';
-                autoApplyNote.style.color = '#ff9800';
-                
                 // 先更新UI状态
                 updateBlurUI(blurEnabled);
                 
@@ -969,20 +1049,7 @@ const std::string HTML_PAGE = R"====(
                     return response.json();
                 })
                 .then(data => {
-                    if (data.success) {
-                        // 显示成功提示
-                        autoApplyNote.innerHTML = '<span class="material-icons-outlined" style="font-size: 14px;">check_circle</span> <span>设置已应用</span>';
-                        autoApplyNote.style.color = '#28a745';
-                        
-                        setTimeout(() => {
-                            autoApplyNote.innerHTML = '<span class="material-icons-outlined" style="font-size: 14px;">autorenew</span> <span>设置已启用自动应用</span>';
-                            autoApplyNote.style.color = '#28a745';
-                        }, 2000);
-                    } else {
-                        // 显示错误提示
-                        autoApplyNote.innerHTML = '<span class="material-icons-outlined" style="font-size: 14px;">error</span> <span>应用失败: ' + (data.error || '未知错误') + '</span>';
-                        autoApplyNote.style.color = '#f44336';
-                        
+                    if (!data.success) {
                         // 恢复之前的复选框状态
                         fetch('/get_blur_settings')
                             .then(response => response.json())
@@ -991,18 +1058,9 @@ const std::string HTML_PAGE = R"====(
                                     updateBlurUI(settings.enabled);
                                 }
                             });
-                        
-                        setTimeout(() => {
-                            autoApplyNote.innerHTML = originalText;
-                            autoApplyNote.style.color = '#28a745';
-                        }, 3000);
                     }
                 })
                 .catch(error => {
-                    // 显示网络错误提示
-                    autoApplyNote.innerHTML = '<span class="material-icons-outlined" style="font-size: 14px;">wifi_off</span> <span>网络错误，请重试</span>';
-                    autoApplyNote.style.color = '#f44336';
-                    
                     // 恢复之前的复选框状态
                     fetch('/get_blur_settings')
                         .then(response => response.json())
@@ -1011,11 +1069,6 @@ const std::string HTML_PAGE = R"====(
                                 updateBlurUI(settings.enabled);
                             }
                         });
-                    
-                    setTimeout(() => {
-                        autoApplyNote.innerHTML = originalText;
-                        autoApplyNote.style.color = '#28a745';
-                    }, 3000);
                     
                     console.error('Error:', error);
                 });
@@ -1031,6 +1084,11 @@ const std::string HTML_PAGE = R"====(
                 if (e.key === 'Enter') {
                     startStream();
                 }
+            });
+            
+            // 马赛克开关事件
+            document.getElementById('blurEnabled').addEventListener('change', function() {
+                applyBlurSettings();
             });
             
             // 视频加载错误处理
