@@ -381,10 +381,12 @@ unsigned char* RknnYolov5Detector::load_image_rga(const YUVFrame& yuv_frame, rkn
         return nullptr;
     }
     
+    #if 0
     if (!rga_ctx || !rga_ctx->rga_handle) {
         LOG_ERROR("Error: RGA context not initialized");
         return nullptr;
     }
+    #endif
     
     // 获取原始图像的宽高和通道数
     *org_width = yuv_frame.width;

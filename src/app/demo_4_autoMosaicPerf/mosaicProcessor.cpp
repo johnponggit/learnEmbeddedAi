@@ -69,6 +69,41 @@ std::vector<uint8_t> MosaicProcessor::process_and_encode(emai::YUVFrame& input_y
     return result;
 }
     
+AVFrame* MosaicProcessor::process(emai::YUVFrame& input_yuv, double& mosaic_time_ms) 
+{
+    std::lock_guard<std::mutex> lock(processor_mutex);
+    AVFrame* retYuv = nullptr;
+    
+    mosaic_time_ms = 0;
+
+    if (input_yuv.empty()) {
+        return retYuv;
+    }
+    
+    try {
+        // 准备输出帧
+        if (!prepare_output_frame(input_yuv)) {
+            return retYuv;
+        }
+        
+        // 如果启用马赛克，对选定区域应用马赛克
+        if (mosaic_settings.enabled) {
+            auto mosaic_start = std::chrono::high_resolution_clock::now();
+            apply_mosaic_to_frame();
+            auto mosaic_end = std::chrono::high_resolution_clock::now();
+            mosaic_time_ms = std::chrono::duration_cast<std::chrono::microseconds>(mosaic_end - mosaic_start).count() / 1000.0;
+        }
+        
+        return output_frame;
+        
+        
+    } catch (const std::exception& e) {
+        std::cerr << "Error in process_and_encode: " << e.what() << std::endl;
+    }
+    
+    return retYuv;
+}
+
 void MosaicProcessor::update_mosaic_settings(int x, int y, int width, int height,
                                                 int block_size, int border_size,
                                                 bool enabled) {

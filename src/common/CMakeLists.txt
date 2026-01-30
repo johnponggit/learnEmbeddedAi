@@ -16,6 +16,7 @@ include_directories(
 # rk平台相关
 if (PLAT_FORM STREQUAL "rv1126")  
 include_directories(
+    ${THIRD_DIR}/rockchip/
     ${THIRD_DIR}/rockchip/rga/include/
     ${THIRD_DIR}/rockchip/librknn_api/include/
 )

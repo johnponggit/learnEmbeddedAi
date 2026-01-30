@@ -47,8 +47,8 @@ int DecoderManager::start_stream(const std::string& rtsp_url)
     decodedFrameBuffer_->clear();
 
     LOG_INFO("Creating VideoDecoder type: FFMPEG_CPU");
-    // decoder_ = std::make_shared<emai::VideoDecoder>(shared_from_this(), emai::FFMPEG_CPU, -1); 
-    decoder_ = std::make_shared<emai::VideoDecoder>(shared_from_this(), emai::FFMPEG_RKMPP, -1); 
+    decoder_ = std::make_shared<emai::VideoDecoder>(shared_from_this(), emai::FFMPEG_CPU, -1); 
+    // decoder_ = std::make_shared<emai::VideoDecoder>(shared_from_this(), emai::FFMPEG_RKMPP, -1); asdftest
     if (!decoder_)
     {
         LOG_ERROR("create VideoDecoder failed");
@@ -79,7 +79,7 @@ int DecoderManager::start_stream(const std::string& rtsp_url)
 
         while (parserStartOk_.load())
         {
-            parser_->ParseLoop(0);
+            parser_->ParseLoop(1000 / parser_->GetVideoInfo().fps);
             parser_->Close();
             
             LOG_INFO("VideoParser ParseLoop to restart, url:" << currentUrl_);
@@ -102,6 +102,15 @@ int DecoderManager::start_stream(const std::string& rtsp_url)
         processing_ = true;
         processThread_ = std::thread(&DecoderManager::processing_loop, this);
     }
+
+    // 启动广播线程
+    if (!broadcasting_) {
+        broadcasting_ = true;
+        broadcast_thread_ = std::thread(&DecoderManager::stream_broadcast_loop, this);
+        LOG_INFO("Stream broadcast thread started");
+    }
+
+    init_h264_encoder(parser_->GetVideoInfo().width, parser_->GetVideoInfo().height);
 
     LOG_INFO("VideoParser ParseLoop thread start successfully, url:" << currentUrl_);
 
@@ -126,6 +135,14 @@ void DecoderManager::stop_all()
     if (processThread_.joinable()) {
         processing_ = false;
         processThread_.join();
+    }
+
+    // 停止广播线程
+    if (broadcast_thread_.joinable()) {
+        broadcasting_ = false;
+        h264_queue_cv_.notify_all();  // 唤醒等待的线程
+        broadcast_thread_.join();
+        LOG_INFO("Stream broadcast thread stopped");
     }
 
     parserStartOk_.store(false);
@@ -154,6 +171,27 @@ void DecoderManager::stop_all()
     if (decodedYuvSwsCtx_) {
         sws_freeContext(decodedYuvSwsCtx_);
         decodedYuvSwsCtx_ = nullptr;
+    }
+
+    // 清理H.264编码器和队列
+    if (h264_encoder_) {
+        h264_encoder_.reset();
+        LOG_INFO("H.264 encoder released");
+    }
+    
+    {
+        std::lock_guard<std::mutex> lock(h264_queue_mutex_);
+        while (!h264_frame_queue_.empty()) {
+            h264_frame_queue_.pop();
+        }
+        LOG_INFO("H.264 frame queue cleared");
+    }
+    
+    // 清理所有客户端
+    {
+        std::lock_guard<std::mutex> lock(clients_mutex_);
+        stream_clients_.clear();
+        LOG_INFO("All stream clients cleared");
     }
 
 
@@ -232,7 +270,7 @@ bool DecoderManager::is_streaming()
     return parserStartOk_;
 }    
 
-
+#if 0
 void DecoderManager::processing_loop() 
 {
     std::vector<uint8_t> last_successful_frame;  // 存储最后一帧成功处理的帧
@@ -339,6 +377,146 @@ void DecoderManager::processing_loop()
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 }
+#endif
+
+void DecoderManager::processing_loop() 
+{
+    LOG_INFO("Processing loop started (H.264 streaming mode)");
+    
+    // 性能监控
+    auto last_stats_time = std::chrono::steady_clock::now();
+    int frames_processed = 0;
+    int idle_cycles = 0;
+    
+    while (processing_) {
+        auto frame_start = std::chrono::high_resolution_clock::now();
+        
+        // 1. 获取YUV帧
+        emai::YUVFrame frame;
+        bool frame_available = false;
+        double decode_time = 0;
+        
+        {
+            std::unique_lock<std::mutex> lock(managerMutex_, std::try_to_lock);
+            if (lock.owns_lock()) {
+                auto start = std::chrono::high_resolution_clock::now();
+                frame_available = decodedFrameBuffer_->get_latest(frame, 0);
+                auto end = std::chrono::high_resolution_clock::now();
+                if (frame_available) 
+                {
+                    LOG_INFO("processing_loop fetch frame tm: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << "ms" <<
+                             ", decodedFrameBuffer_ size: " << decodedFrameBuffer_->size() );
+                }             
+
+            }
+        }
+        
+        if (!frame_available) {
+            idle_cycles++;
+            if (idle_cycles > 100) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                idle_cycles = 100;
+            }
+            continue;
+        }
+        
+        idle_cycles = 0;
+        frames_processed++;
+        
+        // 2. 目标检测
+        double detect_time = 0;
+        if (enable_auto_detect_) {
+            updateMosaicSettingsByDetect(frame, detect_time); 
+        }
+
+        // 3. 马赛克处理
+        double mosaic_time = 0;
+        auto mosaic_start = std::chrono::high_resolution_clock::now();
+        AVFrame* processed_yuv = mosaicProcessor_->process(frame, mosaic_time); 
+        auto mosaic_end = std::chrono::high_resolution_clock::now();
+        mosaic_time = std::chrono::duration_cast<std::chrono::microseconds>(
+            mosaic_end - mosaic_start).count() / 1000.0;
+        
+        // 4. H.264硬件编码
+        double encode_time = 0;
+        if (h264_encoder_ && processed_yuv) {
+            auto encode_start = std::chrono::high_resolution_clock::now();
+            
+            std::vector<uint8_t> h264_data;
+            if (h264_encoder_->EncodeFrame(processed_yuv, h264_data)) {
+                encode_time = std::chrono::duration_cast<std::chrono::microseconds>(
+                    std::chrono::high_resolution_clock::now() - encode_start).count() / 1000.0;
+                
+                // 推送到广播队列
+                std::lock_guard<std::mutex> lock(h264_queue_mutex_);
+        
+                LOG_DEBUG("to push H.264 data, size: " << h264_data.size() << " bytes");
+                h264_frame_queue_.push(std::move(h264_data));
+                LOG_DEBUG("queue size: " << h264_frame_queue_.size());
+
+                h264_queue_cv_.notify_one();
+            }else
+            {
+                LOG_ERROR("Failed to encode frame");
+            }
+
+        }else
+        {
+            LOG_ERROR("H.264 encoder is not initialized or processed_yuv is null:" << (!h264_encoder_) << ", " << (!processed_yuv));
+        }
+
+
+        av_frame_unref(processed_yuv);
+        
+        // 5. 更新性能统计
+        auto frame_end = std::chrono::high_resolution_clock::now();
+        double total_time = std::chrono::duration_cast<std::chrono::microseconds>(
+            frame_end - frame_start).count() / 1000.0;
+        
+        {
+            std::lock_guard<std::mutex> lock(perfMutex_);
+            perfStats_.decode_ms = decode_time;
+            perfStats_.detect_ms = detect_time;
+            perfStats_.mosaic_ms = mosaic_time;
+            perfStats_.encode_ms = encode_time;
+            perfStats_.total_ms = total_time;
+        }
+        
+        // 6. 控制帧率
+        auto now = std::chrono::steady_clock::now();
+        auto frame_interval = std::chrono::duration_cast<std::chrono::milliseconds>(
+            now - last_stats_time).count();
+        
+        if (frame_interval >= 1000) { // 每秒输出统计
+            double fps = frames_processed * 1000.0 / frame_interval;
+            {
+                std::lock_guard<std::mutex> lock(perfMutex_);
+                perfStats_.fps = static_cast<int>(fps);
+            }
+            
+            LOG_INFO("Processing: " << fps << " fps, "
+                     << "Decode=" << decode_time << "ms, "
+                     << "Detect=" << detect_time << "ms, "
+                     << "Mosaic=" << mosaic_time << "ms, "
+                     << "Encode=" << encode_time << "ms, "
+                     << "Total=" << total_time << "ms");
+            
+            frames_processed = 0;
+            last_stats_time = now;
+        }
+        
+        // 动态休眠控制帧率
+        int64_t target_frame_time = 1000 / 25; // 25fps
+        int64_t actual_frame_time = static_cast<int64_t>(total_time);
+        if (actual_frame_time < target_frame_time) {
+            std::this_thread::sleep_for(
+                std::chrono::milliseconds(target_frame_time - actual_frame_time));
+        }
+    }
+    
+    LOG_INFO("Processing loop ended");
+}
+
 
 void DecoderManager::onDecodeEos() {
     LOG_INFO("Decode EOS received");
@@ -347,57 +525,42 @@ void DecoderManager::onDecodeEos() {
 void DecoderManager::onDecodeFrame(AVFrame* frame, const int64_t frmIndex) {
     LOG_DEBUG("Decode frame received, frame index: " << frmIndex);
 
+    auto end = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - onDecodeFrameTime_).count();
+    onDecodeFrameTime_ = std::chrono::high_resolution_clock::now();
+    LOG_DEBUG("onDecodeFrame duration total: " << duration << " ms");
+
     if (!frame)
     {
         LOG_ERROR("frame is null");
         return;
-    }
-
-    // 转换到YUV420P格式（如果需要）
-    AVFrame* converted_frame = const_cast<AVFrame*>(frame); 
+    }  
     
     if (frame->format != AV_PIX_FMT_YUV420P) 
     {
-        LOG_WARN("frame format is not YUV420P, converting...");
-        
-        if (!decodedYuvSwsCtx_) {
-            decodedYuvSwsCtx_ = sws_getContext(
-                frame->width, frame->height,
-                (AVPixelFormat)frame->format,
-                frame->width, frame->height,
-                AV_PIX_FMT_YUV420P,
-                SWS_BILINEAR, nullptr, nullptr, nullptr
-            );
-        }
-        
-        if (decodedYuvSwsCtx_) {
-            AVFrame* yuv_frame = av_frame_alloc();
-            yuv_frame->width = frame->width;
-            yuv_frame->height = frame->height;
-            yuv_frame->format = AV_PIX_FMT_YUV420P;
-            yuv_frame->pts = frame->pts;
-            av_frame_get_buffer(yuv_frame, 0);
-            
-            sws_scale(decodedYuvSwsCtx_, frame->data, frame->linesize,
-                    0, frame->height,
-                    yuv_frame->data, yuv_frame->linesize);
-            
-            converted_frame = yuv_frame;
-        }
+        LOG_ERROR("frame format is not YUV420P");        
+        return;
     }
     
     // 存储YUV数据
-    emai::YUVFrame yuv_frame(converted_frame);
+    auto start1 = std::chrono::high_resolution_clock::now();
+
+    emai::YUVFrame yuv_frame(frame);
+
+    auto end1 = std::chrono::high_resolution_clock::now();
+    LOG_DEBUG("onDecodeFrame duration 1: " << std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start1).count() << " ms");
+
     if (!yuv_frame.empty()) {
-        decodedFrameBuffer_->push(yuv_frame);
+        auto start = std::chrono::high_resolution_clock::now();
+
+        decodedFrameBuffer_->push(std::move(yuv_frame));
+
+        auto end = std::chrono::high_resolution_clock::now();
+        LOG_DEBUG("onDecodeFrame duration 2: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms" <<
+                   ", decodedFrameBuffer_ size: " << static_cast<int>(decodedFrameBuffer_->size()));
     }
     
-    // 清理临时帧
-    if (converted_frame != frame) {
-        av_frame_free(&converted_frame);
-    }
-    
-    av_frame_unref(frame);
+
 
 }
     
@@ -526,6 +689,155 @@ std::string DecoderManager::get_perf_stats_json()
     return ss.str();
 }
 
+void DecoderManager::stream_broadcast_loop() {
+    LOG_INFO("Stream broadcast loop started");
+    
+    const size_t MAX_CLIENT_QUEUE_SIZE = 30;  // 每个客户端最多缓存30帧
+    
+    while (broadcasting_) {
+        std::vector<uint8_t> h264_data;
+        
+        // 等待编码数据
+        {
+            std::unique_lock<std::mutex> lock(h264_queue_mutex_);
+            h264_queue_cv_.wait_for(lock, std::chrono::milliseconds(100), 
+                [this]() { return !h264_frame_queue_.empty() || !broadcasting_; });
+            
+            if (!broadcasting_) break;
+            
+            if (!h264_frame_queue_.empty()) {
+                h264_data = std::move(h264_frame_queue_.front());
+                h264_frame_queue_.pop();
+            }
+        }
+        
+        if (h264_data.empty()) {
+            LOG_WARN("H.264 data is empty");
+            continue;
+        }
+        
+        // 将H.264数据分发给所有客户端
+        {
+            std::lock_guard<std::mutex> lock(clients_mutex_);
+            int64_t now = av_gettime() / 1000;
+            
+            for (auto& [client_id, client] : stream_clients_) {
+                // 限制队列大小，避免内存无限增长
+                if (client.data_queue.size() >= MAX_CLIENT_QUEUE_SIZE) {
+                    // 移除最旧的帧
+                    client.data_queue.pop();
+                    LOG_WARN("Client " << client_id << " queue full, dropping oldest frame");
+                }
+                
+                // 推送数据到客户端队列
+                client.data_queue.push(h264_data);
+                client.sequence++;
+            }
+            
+            perfStats_.stream_clients = stream_clients_.size();
+            
+            LOG_DEBUG("Broadcasted H.264 data to " << stream_clients_.size() 
+                     << " clients, data size: " << h264_data.size());
+        }
+    }
+    
+    LOG_INFO("Stream broadcast loop ended");
+}
+
+bool DecoderManager::init_h264_encoder(int width, int height) {
+
+    if (h264_encoder_) {
+        LOG_INFO("H.264 encoder already initialized");
+        return true;
+    }
+    
+    h264_encoder_ = std::make_unique<emai::MppH264Encoder>();
+    if (!h264_encoder_->Init(width, height, dst_width_, dst_height_, 25, 2000000)) {
+        LOG_ERROR("Failed to initialize H.264 hardware encoder");
+        h264_encoder_.reset();
+        return false;
+    }
+   
+    
+    LOG_INFO("H.264 hardware encoder initialized: " << width << "x" << height);
+    return true;
+}
+
+int DecoderManager::register_flv_client() {
+    std::lock_guard<std::mutex> lock(clients_mutex_);
+    int client_id = next_client_id_++;
+    
+    StreamClient client;
+    client.last_active_time = av_gettime() / 1000;
+    client.sequence = 0;
+    // data_queue 会自动初始化为空队列
+    
+    stream_clients_[client_id] = std::move(client);
+    
+    LOG_INFO("New FLV client registered: " << client_id 
+             << ", total clients: " << stream_clients_.size());
+    return client_id;
+}
+
+void DecoderManager::unregister_flv_client(int client_id) {
+    std::lock_guard<std::mutex> lock(clients_mutex_);
+    if (stream_clients_.erase(client_id)) {
+        LOG_INFO("FLV client unregistered: " << client_id
+                 << ", remaining clients: " << stream_clients_.size());
+    }
+}
+
+bool DecoderManager::get_sps_pps_data(std::vector<uint8_t>& sps, std::vector<uint8_t>& pps) {
+    if (!h264_encoder_) {
+        LOG_ERROR("H.264 encoder not initialized");
+        return false;
+    }
+    
+    // 从编码器获取SPS和PPS
+    sps = h264_encoder_->GetSpsData();
+    pps = h264_encoder_->GetPpsData();
+    
+    if (sps.empty() || pps.empty()) {
+        LOG_WARN("SPS or PPS is empty from encoder (SPS: " << sps.size() << ", PPS: " << pps.size() << ")");
+        return false;
+    }
+    
+    LOG_INFO("Got SPS/PPS from encoder: SPS=" << sps.size() << " bytes, PPS=" << pps.size() << " bytes");
+    return true;
+}
+
+bool DecoderManager::get_flv_stream_data(std::vector<uint8_t>& data, int client_id) {
+    std::lock_guard<std::mutex> lock(clients_mutex_);
+    
+    // 查找客户端
+    auto it = stream_clients_.find(client_id);
+    if (it == stream_clients_.end()) {
+        LOG_WARN("Client " << client_id << " not found");
+        return false;
+    }
+    
+    // 从客户端队列中获取数据
+    if (!it->second.data_queue.empty()) {
+        data = std::move(it->second.data_queue.front());
+        it->second.data_queue.pop();
+        it->second.last_active_time = av_gettime() / 1000;
+        
+        LOG_DEBUG("Client " << client_id << " retrieved data, size: " << data.size() 
+                 << ", remaining queue: " << it->second.data_queue.size());
+        return true;
+    }
+    
+    return false;
+}
+
+
+bool DecoderManager::get_encoder_config(int& width, int& height, int& fps) 
+{
+    width = dst_width_;
+    height = dst_height_;
+    fps = 25;
+    return true;
+}
 
 
 

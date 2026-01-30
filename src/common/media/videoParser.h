@@ -56,6 +56,8 @@ private:
 };
 
 std::string avErrorToString(int errnum);
+int InterruptCallBack(void* ctx);
+
 
 }  // namespace detail
  
@@ -73,6 +75,9 @@ struct VideoInfo {
     std::string url;
 };
  
+const uint32_t kDefaultFps = 25;
+
+void printVersionInfo();
 std::ostream& operator<<(std::ostream& os, const VideoInfo& info);
 
 class IDemuxEventHandle {

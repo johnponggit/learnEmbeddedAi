@@ -1,71 +1,13 @@
 
- #include "videoParser.h"
-
- #include <atomic>
- #include <chrono>
- #include <thread>
- 
- 
- #ifdef __cplusplus
- extern "C" {
- #endif
- #include <libavcodec/avcodec.h>
- #include <libavformat/avformat.h>
- #include <libavutil/avutil.h>
- #include <libavutil/imgutils.h>
- #ifdef __cplusplus
- }
- #endif
- #ifdef __GNUC__
- #pragma GCC diagnostic push
- #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
- #endif
- 
- namespace emai{
+#include "videoParserAsync.h"
 
 
-void printVersionInfo() {
-    unsigned int version = avformat_version();
-    
-    LOG_INFO("libavformat 版本信息: " << AV_VERSION_MAJOR(version) << "." << AV_VERSION_MINOR(version) << "." << AV_VERSION_MICRO(version));   
-    LOG_INFO("配置信息: " << avformat_configuration());
-    LOG_INFO("许可证: " << avformat_license());
-    
-    
-    // avformat_version_info();
-}
+namespace emai{
 
-std::ostream& operator<<(std::ostream& os, const VideoInfo& info)
-{
-    return os << "VideoInfo{ width:" << info.width
-              << ", height:" << info.height
-              << ", codec_id:" << info.codec_id
-              << ", progressive:" << info.progressive
-              << ", url:" << info.url
-              << " }";
-}
 
- namespace detail {
- int InterruptCallBack(void* ctx) {
-    VideoParser* parser = reinterpret_cast<VideoParser*>(ctx);
-    if (parser->CheckTimeout()) {
-        LOG_INFO("Rtsp: Get interrupt and timeout");
-        return 1;
-    }
-   return 0;
- }
 
-std::string avErrorToString(int errnum) {
-    char errbuf[AV_ERROR_MAX_STRING_SIZE];
-    if (av_strerror(errnum, errbuf, sizeof(errbuf)) == 0) {
-        return std::string(errbuf);
-    }
-    return "unknown error";
-}
 
- }  // namespace detail
- 
-bool VideoParser::CheckTimeout() {
+bool VideoParserAsync::CheckTimeout() {
     std::chrono::duration<float, std::milli> dura = std::chrono::steady_clock::now() - last_receive_frame_time_;
     if (dura.count() > max_receive_timeout_) {
         return true;
@@ -73,7 +15,7 @@ bool VideoParser::CheckTimeout() {
     return false;
 }
 
-bool VideoParser::Open(const char *url, bool save_file) {
+bool VideoParserAsync::Open(const char *url, bool save_file) {
     static struct _InitFFmpeg {
         _InitFFmpeg() {
             // init ffmpeg            
@@ -91,6 +33,14 @@ bool VideoParser::Open(const char *url, bool save_file) {
 
     is_rtsp_ = emai::IsRtsp(url);
     if (have_video_source_.load()) return false;
+    
+    // 清空异步队列
+    ClearAsyncQueue();
+    
+    // 启动异步处理线程
+    async_running_ = true;
+    async_thread_ = std::thread(&VideoParserAsync::AsyncProcessingThread, this);
+    
     // format context
     p_format_ctx_ = avformat_alloc_context();
     if (!p_format_ctx_) return false;
@@ -111,12 +61,16 @@ bool VideoParser::Open(const char *url, bool save_file) {
     int ret_code = avformat_open_input(&p_format_ctx_, url, NULL, &options_);
     if (0 != ret_code) {        
         LOG_ERROR("Can not open input stream: " << url << ", avformat_open_input failed, ret_code:" << ret_code << ", errMsg:" << detail::avErrorToString(ret_code));
+        // 停止异步线程
+        StopAsyncProcessing();
         return false;
     }
     // find video stream information
     ret_code = avformat_find_stream_info(p_format_ctx_, NULL);
     if (ret_code < 0) {
         LOG_ERROR("url:" << url << " Can not find stream information, ret_code:" << ret_code << ", errMsg:" << detail::avErrorToString(ret_code));
+        // 停止异步线程
+        StopAsyncProcessing();
         return false;
     }
     video_index_ = -1;
@@ -149,6 +103,8 @@ bool VideoParser::Open(const char *url, bool save_file) {
 
     if (video_index_ == -1) {
         LOG_ERROR("url:" << url << " Can not find a video stream.");
+        // 停止异步线程
+        StopAsyncProcessing();
         return false;
     }
 
@@ -207,6 +163,8 @@ bool VideoParser::Open(const char *url, bool save_file) {
             if (save_file) saver_.reset(new detail::FileSaver("out.h265"));
         } else {
             LOG_ERROR("url:" << url << " Unsupported codec id: " << codec_id);
+            // 停止异步线程
+            StopAsyncProcessing();
             return false;
         }
     }
@@ -218,16 +176,21 @@ bool VideoParser::Open(const char *url, bool save_file) {
     
     if (handler_ && !handler_->OnParseInfo(info_)) {
         LOG_ERROR("url:" << url << " OnParseInfo err");
+        // 停止异步线程
+        StopAsyncProcessing();
         return false;
     }
 
     return true;
 }
 
-void VideoParser::Close() {
+void VideoParserAsync::Close() {
     if (!have_video_source_.load()) return;
-    LOG_INFO("url:" << info_.url << " VideoParser::Close(): Clear FFMpeg resources");
+    LOG_INFO("url:" << info_.url << " VideoParserAsync::Close(): Clear FFMpeg resources");
 
+    // 停止异步处理线程
+    StopAsyncProcessing();
+    
     if (p_format_ctx_) {
         avformat_close_input(&p_format_ctx_);
         avformat_free_context(p_format_ctx_);
@@ -244,29 +207,38 @@ void VideoParser::Close() {
     }
 }
 
-int VideoParser::ParseLoop(uint32_t frame_interval) {
+int VideoParserAsync::ParseLoop(uint32_t frame_interval) {
     auto now_time = std::chrono::steady_clock::now();
     auto last_time = std::chrono::steady_clock::now();
     std::chrono::duration<double, std::milli> dura;
 
     while (parseLoopRunning_.load()) {
         if (!have_video_source_.load()) {
-            LOG_ERROR("url:" << info_.url << " VideoParser::ParseLoop(): Video source has not been init");
+            LOG_ERROR("url:" << info_.url << " VideoParserAsync::ParseLoop(): Video source has not been init");
             return -1;
         }
+
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - onParseFrameTime_).count();
+        onParseFrameTime_ = std::chrono::high_resolution_clock::now();
+        LOG_DEBUG("ParseLoop duration: " << duration << " ms");
+
 
         int ret = 0;
         if ((ret = av_read_frame(p_format_ctx_, &packet_)) < 0) {
             // EOS
             if (ret == AVERROR_EOF) {
-                LOG_INFO("url:" << info_.url << " VideoParser::ParseLoop(): av_read_frame hit end of stream");
-                if (handler_) {handler_->OnEos();}
+                LOG_INFO("url:" << info_.url << " VideoParserAsync::ParseLoop(): av_read_frame hit end of stream");
+                if (handler_) {
+                    // 异步发送EOS
+                    SendEosToAsyncQueue();
+                }
                 return 1;
             } if (isRecoverableError(ret)) {
-                LOG_WARN("url:" << info_.url << " VideoParser::ParseLoop(): av_read_frame recoverable error, ret:" << ret << ", errMsg:" << detail::avErrorToString(ret));
+                LOG_WARN("url:" << info_.url << " VideoParserAsync::ParseLoop(): av_read_frame recoverable error, ret:" << ret << ", errMsg:" << detail::avErrorToString(ret));
                 continue;
             } else {
-                LOG_ERROR("url:" << info_.url << " VideoParser::ParseLoop(): av_read_frame error, ret:" << ret << ", errMsg:" << detail::avErrorToString(ret));
+                LOG_ERROR("url:" << info_.url << " VideoParserAsync::ParseLoop(): av_read_frame error, ret:" << ret << ", errMsg:" << detail::avErrorToString(ret));
                 return -1;
             }
         }
@@ -282,11 +254,11 @@ int VideoParser::ParseLoop(uint32_t frame_interval) {
 
         // filter non-key-frame in head
         if (first_frame_) {
-            LOG_INFO("url:" << info_.url << " VideoParser::ParseLoop(): Check first frame");
+            LOG_INFO("url:" << info_.url << " VideoParserAsync::ParseLoop(): Check first frame");
             if (packet_.flags & AV_PKT_FLAG_KEY) {
                 first_frame_ = false;
             } else {
-                LOG_DEBUG("url:" << info_.url << " VideoParser::ParseLoop(): Skip first not-key-frame");
+                LOG_DEBUG("url:" << info_.url << " VideoParserAsync::ParseLoop(): Skip first not-key-frame");
                 av_packet_unref(&packet_);
                 continue;
             }
@@ -297,7 +269,7 @@ int VideoParser::ParseLoop(uint32_t frame_interval) {
         frame_index_++;
         // find pts information
         if (AV_NOPTS_VALUE == packet_.pts) {
-            LOG_INFO("url:" << info_.url << " VideoParser::ParseLoop(): Didn't find pts informations, use ordered numbers instead.");
+            LOG_INFO("url:" << info_.url << " VideoParserAsync::ParseLoop(): Didn't find pts informations, use ordered numbers instead.");
             packet_.pts = frame_index_;
         } else {
             packet_.pts = av_rescale_q(packet_.pts, vstream->time_base, {1, 90000});
@@ -307,14 +279,13 @@ int VideoParser::ParseLoop(uint32_t frame_interval) {
             saver_->Write(reinterpret_cast<char *>(packet_.data), packet_.size);
         }
 
-        LOG_DEBUG("url:" << info_.url << " VideoParser::ParseLoop(): Get video packet, size=" << packet_.size
+        LOG_DEBUG("url:" << info_.url << " VideoParserAsync::ParseLoop(): Get video packet, size=" << packet_.size
                      << ", pts=" << packet_.pts << ", dts=" << packet_.dts
                      << ", stream_index=" << packet_.stream_index << ", is key_frame=" << ((packet_.flags & AV_PKT_FLAG_KEY) ? "yes" : "no"));
 
-        if (handler_ && !handler_->OnPacket(&packet_, frame_index_)) 
-        {
-            av_packet_unref(&packet_);
-            return -1; 
+        // 异步处理数据包
+        if (handler_ && !AsyncProcessPacket(&packet_, frame_index_)) {
+            LOG_WARN("url:" << info_.url << " Failed to queue packet for async processing");
         }
 
         av_packet_unref(&packet_);
@@ -333,9 +304,7 @@ int VideoParser::ParseLoop(uint32_t frame_interval) {
     return 1;
 }
 
-
-
-bool VideoParser::isRecoverableError(int error_code) {
+bool VideoParserAsync::isRecoverableError(int error_code) {
     // 定义哪些错误是可以恢复的
     switch (error_code) {
         case AVERROR(EAGAIN):    // 需要重试
@@ -346,8 +315,159 @@ bool VideoParser::isRecoverableError(int error_code) {
     }
 }
 
+// 异步处理相关方法实现
+bool VideoParserAsync::AsyncProcessPacket(const AVPacket* packet, int64_t frame_index) {
+    if (!async_running_) {
+        LOG_WARN("Async processing not running");
+        return false;
+    }
+    
+    // 检查队列大小，防止内存溢出
+    {
+        std::lock_guard<std::mutex> lock(async_queue_mutex_);
+        
+        if (async_packet_queue_.size() >= max_async_queue_size_) {
+            // 队列满了，可以根据策略处理（这里简单丢弃最旧的包）
+            LOG_WARN("Async queue full (" << async_packet_queue_.size() << " packets), dropping oldest packet");
+            
+            if (!async_packet_queue_.empty()) {
+                async_packet_queue_.pop();
+                dropped_packets_++;
+                
+                // 定期报告丢弃的包数量
+                if (dropped_packets_ % 10 == 0) {
+                    LOG_WARN("Total dropped packets: " << dropped_packets_);
+                }
+            }
+        }
+        
+        // 将数据包加入异步队列
+        try {
+            async_packet_queue_.emplace(std::make_unique<AsyncPacket>(packet, frame_index));
+        } catch (const std::exception& e) {
+            LOG_ERROR("Failed to create async packet: " << e.what());
+            return false;
+        }
+    }
+    
+    // 通知异步处理线程有新数据
+    async_queue_cv_.notify_one();
+    return true;
+}
 
+void VideoParserAsync::SendEosToAsyncQueue() {
+    // 设置EOS标志
+    async_eos_sent_ = true;
+    // 通知异步处理线程检查EOS
+    async_queue_cv_.notify_one();
+}
 
+void VideoParserAsync::AsyncProcessingThread() {
+    LOG_INFO("Async processing thread started");
+    
+    while (async_running_) {
+        std::unique_ptr<AsyncPacket> packet;
+        
+        // 从队列中获取数据包
+        {
+            std::unique_lock<std::mutex> lock(async_queue_mutex_);
+            
+            // 等待数据包或停止信号
+            async_queue_cv_.wait(lock, [this]() {
+                return !async_packet_queue_.empty() || !async_running_ || async_eos_sent_;
+            });
+            
+            if (!async_running_) {
+                break;
+            }
+            
+            // 检查是否应该发送EOS
+            if (async_eos_sent_ && async_packet_queue_.empty()) {
+                LOG_INFO("Async queue empty and EOS sent, calling handler OnEos");
+                if (handler_) {
+                    handler_->OnEos();
+                }
+                async_eos_sent_ = false;
+                continue;
+            }
+            
+            if (async_packet_queue_.empty()) {
+                continue;
+            }
+            
+            // 取出数据包
+            packet = std::move(async_packet_queue_.front());
+            async_packet_queue_.pop();
+        }
+        
+        // 处理数据包
+        if (packet && handler_) {
+            try {
+                // 计算队列延迟（用于监控）
+                auto now = std::chrono::steady_clock::now();
+                auto queue_delay = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    now - packet->enqueue_time).count();
+                
+                if (queue_delay > 100) { // 延迟超过100ms
+                    LOG_WARN("Packet queue delay: " << queue_delay << "ms for frame " << packet->frame_index);
+                }
+                
+                // 调用handler处理数据包
+                bool success = handler_->OnPacket(&packet->packet, packet->frame_index);
+                if (!success) {
+                    LOG_WARN("Handler failed to process packet for frame " << packet->frame_index);
+                }
+                
+                processed_packets_++;
+                
+                // 定期报告处理进度
+                if (processed_packets_ % 100 == 0) {
+                    LOG_INFO("Async processed packets: " << processed_packets_ << ", queue size: " << async_packet_queue_.size());
+                }
+                
+            } catch (const std::exception& e) {
+                LOG_ERROR("Exception in async processing: " << e.what());
+            }
+        }
+    }
+    
+    LOG_INFO("Async processing thread stopped");
+}
+
+void VideoParserAsync::StopAsyncProcessing() {
+    if (!async_running_) {
+        return;
+    }
+    
+    LOG_INFO("Stopping async processing thread");
+    async_running_ = false;
+    async_queue_cv_.notify_all();
+    
+    if (async_thread_.joinable()) {
+        async_thread_.join();
+    }
+    
+    // 清空队列
+    ClearAsyncQueue();
+    
+    LOG_INFO("Async processing stopped, processed packets: " << processed_packets_ << ", dropped packets: " << dropped_packets_);
+}
+
+void VideoParserAsync::ClearAsyncQueue() {
+    std::lock_guard<std::mutex> lock(async_queue_mutex_);
+    
+    size_t cleared_count = async_packet_queue_.size();
+    while (!async_packet_queue_.empty()) {
+        async_packet_queue_.pop();
+    }
+    
+    if (cleared_count > 0) {
+        LOG_INFO("Cleared " << cleared_count << " packets from async queue");
+    }
+    
+    async_eos_sent_ = false;
+    processed_packets_ = 0;
+    dropped_packets_ = 0;
+}
 
 }
- 

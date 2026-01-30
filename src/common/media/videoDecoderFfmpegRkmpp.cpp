@@ -293,6 +293,10 @@ bool VideoDecoderFfmpegRkmpp::FeedPacket(const AVPacket* pkt, const int64_t frmI
                          << ", format=" << GetPixelFormatName((AVPixelFormat)hw_frame_->format));
             }
 
+            auto end1 = std::chrono::high_resolution_clock::now();
+            auto duration1 = std::chrono::duration_cast<std::chrono::milliseconds>(end1 - end).count();
+            LOG_DEBUG("VideoDecoderFfmpegRkmpp FeedPacket: to ProcessFrame, duration1 =" << duration1 << " ms");
+            
             ProcessFrame(frame_to_process, frmIndex);
             
             // 清理转换的帧

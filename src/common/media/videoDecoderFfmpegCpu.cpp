@@ -102,6 +102,10 @@ bool VideoDecoderFfmpegCpu::FeedPacket(const AVPacket* pkt, const int64_t frmInd
         return false;
     }
 
+    auto end = std::chrono::high_resolution_clock::now();
+    LOG_DEBUG("FeedPacket duration total: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - feedPacketFrameTime_).count() << " ms");
+    feedPacketFrameTime_ = std::chrono::high_resolution_clock::now();
+
     if (!pkt || (pkt->size == 0 && pkt->data == NULL)) {
         LOG_ERROR("in VideoDecoderFfmpegCpu FeedPacket invalid pkt, data ptr, size:"
                 << (pkt ? pkt->data : nullptr) << ", " << (pkt ? pkt->size : -1));
@@ -141,16 +145,19 @@ bool VideoDecoderFfmpegCpu::FeedPacket(const AVPacket* pkt, const int64_t frmInd
                 LOG_ERROR("avframe err, width:" << av_frame_->width << ",height:" << av_frame_->height);
                 continue;
             }
-            
+
             auto end = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
             LOG_DEBUG("VideoDecoderFfmpegCpu FeedPacket: Got decoded frame, pts=" << av_frame_->pts
                          << ", format=" << av_frame_->format
                          << ", width=" << av_frame_->width
-                         << ", height=" << av_frame_->height
-                         << ", duration=" << duration << " ms");
-            
-            ProcessFrame(av_frame_, frmIndex);
+                         << ", height=" << av_frame_->height);
+            LOG_DEBUG("FeedPacket duration decode: " << std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count() << " ms");
+ 
+                     
+            auto start1 = std::chrono::high_resolution_clock::now();
+            ProcessFrame(av_frame_, frmIndex); 
+            auto end1 = std::chrono::high_resolution_clock::now();
+            LOG_DEBUG("FeedPacket duration ProcessFrame: " << std::chrono::duration_cast<std::chrono::milliseconds>(end1 - start1).count() << " ms");
         }
 
         av_frame_unref(av_frame_);

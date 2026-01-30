@@ -39,6 +39,8 @@ public:
     
     // 处理主画面：应用马赛克并编码为JPEG
     std::vector<uint8_t> process_and_encode(emai::YUVFrame& input_yuv, double& mosaic_time_ms, double& encode_time_ms); 
+    
+    AVFrame* process(emai::YUVFrame& input_yuv, double& mosaic_time_ms); 
 
     // 更新马赛克设置
     void update_mosaic_settings(int x, int y, int width, int height,

@@ -3,14 +3,14 @@
 #include <memory>
 #include <string>
  
- 
+
 #include "videoDecoder.h"
 #include "videoDecoderFfmpegCpu.h"
 #include "videoDecoderFfmpegRkmpp.h"
 
 #include "util.h"
 
-namespace emai{
+namespace emai {
  
 VideoDecoder::VideoDecoder(IDecodeEventHandle::wPtr handle, DecoderType type, int device_id) : device_id_(device_id)
 {
@@ -22,7 +22,7 @@ VideoDecoder::VideoDecoder(IDecodeEventHandle::wPtr handle, DecoderType type, in
             break;
 
         case FFMPEG_RKMPP:
-            impl_ = std::make_unique<VideoDecoderFfmpegRkmpp>(handle, true);
+            impl_ = std::make_unique<VideoDecoderFfmpegRkmpp>(handle, false);
             break;
 
         default:
@@ -61,17 +61,17 @@ void VideoDecoder::OnEos() {
     if (send_eos_ == false) {
         LOG_INFO("VideoDecoder OnEos(): Feed EOS");
         impl_->FeedEos();
-        send_eos_ = true;
+    send_eos_ = true;
     }
 }
- 
+
 bool VideoDecoder::Running() {
     //return runner_->Running();
     return true;
 }
- 
+
 void VideoDecoder::Destroy() {
-    impl_->unInit();
-}
- 
+        impl_->unInit();
+    }
+    
 }  // namespace emai
