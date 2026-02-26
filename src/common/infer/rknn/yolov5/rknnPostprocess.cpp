@@ -17,16 +17,18 @@
 #include <math.h>
 #include <string.h>
 #include <sys/time.h>
+#include <unistd.h>
 #include <vector>
 #include <set>
 #include <stdint.h>
+#include <errno.h>
 
 #include "util.h"
 #include "rknnPostprocess.h"
 
 namespace emai {
 
-#define LABEL_NALE_TXT_PATH "./coco_80_labels_list.txt"
+#define LABEL_NALE_TXT_PATH "/userdata/tmp/human_detect/model/coco_80_labels_list.txt"
 
 static char *labels[OBJ_CLASS_NUM];
 
@@ -78,7 +80,27 @@ char *readLine(FILE *fp, char *buffer, int *len)
 
 int readLines(const char *fileName, char *lines[], int max_line)
 {
+    LOG_INFO("Attempting to read lines from file: " << fileName);
+
+    // 检查文件是否存在
+    if (access(fileName, F_OK) == 0) {
+        LOG_INFO("Label file exists: " << fileName);
+    } else {
+        LOG_ERROR("Label file does NOT exist: " << fileName);
+        char cwd[256];
+        if (getcwd(cwd, sizeof(cwd)) != NULL) {
+            LOG_ERROR("Current working directory: " << cwd);
+        }
+        return 0;
+    }
+
     FILE *file = fopen(fileName, "r");
+    if (!file) {
+        LOG_ERROR("Failed to open label file: " << fileName << ", errno: " << strerror(errno));
+        return 0;
+    }
+    LOG_INFO("Successfully opened label file: " << fileName);
+
     char *s;
     int i = 0;
     int n = 0;
@@ -88,6 +110,9 @@ int readLines(const char *fileName, char *lines[], int max_line)
         if (i >= max_line)
             break;
     }
+    fclose(file);
+
+    LOG_INFO("Read " << i << " labels from file");
     return i;
 }
 

@@ -28,7 +28,7 @@ public:
 private:
     const char *get_type_string(rknn_tensor_type type);
     const char *get_format_string(rknn_tensor_format fmt);
-    const char *get_qnt_type_string(rknn_tensor_qnt_type type);  
+    const char *get_qnt_type_string(rknn_tensor_qnt_type type);
 
     unsigned char *load_data(FILE *fp, size_t ofst, size_t sz);
     unsigned char *load_model(const char *filename, int *model_size);
@@ -42,7 +42,7 @@ private:
     rknn_context                 ctx;
     float                        nms_threshold = NMS_THRESH;
     float                        box_conf_threshold = BOX_THRESH;
-    std::string                  model_path = "./yolov5s_relu_rv1109_rv1126_out_opt.rknn";
+    std::string                  model_path = "/userdata/tmp/human_detect/model/yolov5s_relu_rv1109_rv1126_out_opt.rknn";  
     unsigned char               *model_data = nullptr;
 
     rknn_input_output_num        io_num;

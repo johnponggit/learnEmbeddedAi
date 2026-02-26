@@ -4,6 +4,9 @@
 
 #include "jpegEncoderFfmpegCpu.h"
 
+#include <errno.h>
+#include <unistd.h>
+
 namespace emai
 {
     
@@ -23,12 +26,23 @@ int RknnYolov5Detector::init()
         return -1;
     }
 
+    // 记录当前工作目录和模型路径
+    char cwd[256];
+    if (getcwd(cwd, sizeof(cwd)) != NULL) {
+        LOG_INFO("Current working directory: " << cwd);
+    }
+    LOG_INFO("Model path: " << model_path);
+
     memset(&rga_ctx, 0, sizeof(rga_context));
 
     /* Create the neural network */
     LOG_INFO("Loading model...");
     int model_data_size = 0;
     model_data = load_model(model_path.c_str(), &model_data_size);
+    if (!model_data) {
+        LOG_ERROR("Failed to load model data");
+        return -1;
+    }
     auto ret = rknn_init(&ctx, model_data, model_data_size, 0);
     if (ret < 0)
     {
@@ -289,25 +303,41 @@ unsigned char *RknnYolov5Detector::load_data(FILE *fp, size_t ofst, size_t sz)
 
 unsigned char *RknnYolov5Detector::load_model(const char *filename, int *model_size)
 {
-
     FILE *fp;
     unsigned char *data;
+
+    LOG_INFO("Attempting to load model from: " << filename);
+
+    // 检查文件是否存在
+    if (access(filename, F_OK) == 0) {
+        LOG_INFO("Model file exists: " << filename);
+    } else {
+        LOG_ERROR("Model file does NOT exist: " << filename);
+        char cwd[256];
+        if (getcwd(cwd, sizeof(cwd)) != NULL) {
+            LOG_ERROR("Current working directory: " << cwd);
+        }
+        return NULL;
+    }
 
     fp = fopen(filename, "rb");
     if (NULL == fp)
     {
-        printf("Open file %s failed.\n", filename);
+        LOG_ERROR("Failed to open file: " << filename << ", errno: " << strerror(errno));
         return NULL;
     }
+    LOG_INFO("Successfully opened model file: " << filename);
 
     fseek(fp, 0, SEEK_END);
     int size = ftell(fp);
+    LOG_INFO("Model file size: " << size << " bytes");
 
     data = load_data(fp, 0, size);
 
     fclose(fp);
 
     *model_size = size;
+    LOG_INFO("Model loaded successfully");
     return data;
 }
 
