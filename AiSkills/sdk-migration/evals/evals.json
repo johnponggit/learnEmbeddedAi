@@ -1,0 +1,23 @@
+{
+  "skill_name": "sdk-migration",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我分析这个SDK包 /work/sophon_release",
+      "expected_output": "扫描SDK目录结构，识别Sophon SDK组件，列出支持的芯片和工作模式，询问用户具体需求",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "适配新SDK，我需要把代码从旧版本迁移到这个SDK",
+      "expected_output": "扫描SDK，询问芯片类型、工作模式、需要迁移的功能模块，提供迁移建议和文档位置",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "SDK迁移，我的项目使用BM1684X芯片，PCIe模式，需要设备管理和模型推理功能",
+      "expected_output": "针对BM1684X PCIe模式提供设备管理和模型推理相关的API文档位置、安装命令、适配建议",
+      "files": []
+    }
+  ]
+}
